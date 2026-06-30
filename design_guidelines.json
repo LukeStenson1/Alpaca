@@ -1,0 +1,58 @@
+{
+  "theme": "light",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "concept": "The Terminal. A high-precision, low-noise algorithmic trading control room focusing on data density, authority, and functional clarity.",
+  "typography": {
+    "headings": "IBM Plex Sans",
+    "body": "IBM Plex Sans",
+    "mono": "JetBrains Mono",
+    "scale_rules": "H1 max text-4xl. Use tracking-tight for headings to maintain a technical feel. Critical: ALL numeric data, stock tickers, P&L, and strategy parameters must use the monospace font (font-mono) and tabular-nums to prevent layout shifting during live updates."
+  },
+  "colors": {
+    "background": "#F4F4F5",
+    "surface": "#FFFFFF",
+    "text_primary": "#09090B",
+    "text_secondary": "#71717A",
+    "accents": {
+      "primary": "#002FA7",
+      "kill_switch_danger": "#DC2626",
+      "warning_suggestions": "#D97706",
+      "profit_positive": "#16A34A",
+      "loss_negative": "#DC2626"
+    },
+    "rules": "Strict adherence to high contrast. Do not use soft shadows or glassmorphism. Surfaces should be defined by crisp 1px borders (border-zinc-200)."
+  },
+  "layout": {
+    "strategy": "Control Room Grid",
+    "spacing_scale": "Dense. Use p-4 to p-6 inside cards. Grid gaps should be tight (gap-4 or gap-6).",
+    "structure": "Sidebar or top-nav for main sections (Overview, Watchlist, Trade History, Suggestions, Settings). Maximize screen real estate. Use a fluid grid for dashboard widgets."
+  },
+  "components": {
+    "cards": "Flat design. 1px solid border (border-zinc-200), pure white background, zero shadow, max rounded-md.",
+    "tables": "Shadcn Table. Highly compact. Right-align all numeric columns. Apply font-mono and text-sm to table cells.",
+    "buttons": "Sharp, technical. Rounded-md or rounded-sm. The Kill Switch must be prominently red with a distinct visual weight.",
+    "forms": "Use Shadcn primitives. Inputs should have clear, stark borders (focus:ring-1 focus:ring-black).",
+    "charts": "Recharts. Monochrome lines with clean axes, utilizing green/red fills only for P&L visualization.",
+    "badges": "Used for statuses (Live vs Paper, Active vs Inactive). High-contrast solid fills."
+  },
+  "motion": {
+    "rules": "Instant and functional. Avoid purely decorative motion. Use minimal opacity transitions for hovers. Skeleton loaders for data fetching."
+  },
+  "accessibility": {
+    "contrast": "Strict APCA/WCAG AA adherence. Avoid relying solely on red/green for profit/loss; include +/- prefixes.",
+    "testing": "MANDATORY: All interactive elements (buttons, links, form inputs, toggles) must include a data-testid attribute in kebab-case."
+  },
+  "media": {
+    "empty_state_graphic": "https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTB8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGdlb21ldHJpYyUyMG1pbmltYWwlMjBkYXRhfGVufDB8fHx8MTc4Mjg0NjQxNXww&ixlib=rb-4.1.0&q=85",
+    "usage": "Use this minimal abstract graphic purely for empty states (e.g., no pending suggestions, no open positions)."
+  },
+  "instructions_to_main_agent": [
+    "CRITICAL: The project uses .js/.jsx, NOT .tsx. All components must be written in JavaScript. Do not emit TypeScript syntax or types.",
+    "Install standard packages if missing: lucide-react for icons, recharts for sparklines.",
+    "Implement 5 core pages: Overview, Watchlist, Trade History, Suggestions, Settings.",
+    "The 'Kill Switch' must be accessible instantly, ideally housed in the persistent layout header.",
+    "Ensure 'Live Trading' toggle in Settings requires a typed 'CONFIRM LIVE' validation.",
+    "All tables (Positions, Watchlist, History) must utilize font-mono for data points to enforce the 'terminal' aesthetic.",
+    "Use data-testid on all key elements (e.g., data-testid='kill-switch', data-testid='watchlist-add-btn', data-testid='approve-suggestion-btn')."
+  ]
+}

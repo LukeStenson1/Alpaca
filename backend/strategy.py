@@ -194,38 +194,45 @@ def _evaluate_sells(db, svc, ticker, params, snapshot, pstate, pos, summary):
     gain = (price - entry) / entry if entry else 0.0
     steps = params.sell_gain_steps or []
     executed = list(pstate.tranches_executed or [])
+    available = pos["qty"]
 
-    for idx, step in enumerate(steps):
-        if idx in executed:
-            continue
-        if gain >= step:
-            sell_qty = pstate.original_qty * params.sell_tranche_pct
-            available = pos["qty"]
-            sell_qty = min(sell_qty, available)
-            if sell_qty <= 0:
-                continue
-            reason = (
-                f"tranche {idx + 1} of {len(steps)} at +{gain * 100:.1f}% gain "
-                f"(step trigger +{step * 100:.1f}%)"
-            )
-            order = svc.submit_sell_qty(ticker, sell_qty)
-            realized = (price - entry) * sell_qty
-            pstate.realized_pnl = (pstate.realized_pnl or 0.0) + realized
-            db.add(Trade(
-                ticker=ticker, side="sell", quantity=round(sell_qty, 6), price=price,
-                order_id=order["id"], trigger_reason=reason, params_snapshot=snapshot,
-                realized_pnl=round(realized, 2), timestamp=utcnow(),
-            ))
-            executed.append(idx)
-            pstate.tranches_executed = executed
-            available -= sell_qty
-            db.commit()
-            summary["sells"].append({
-                "ticker": ticker, "qty": round(sell_qty, 6),
-                "realized_pnl": round(realized, 2), "reason": reason,
-            })
+    # all not-yet-executed steps the current gain already clears
+    qualifying = [i for i, step in enumerate(steps) if i not in executed and gain >= step]
+    if not qualifying:
+        return
 
-    # close position state if all tranches done or no shares left
+    # Aggregate qualifying tranches into ONE sell order. Placing several market
+    # sells in the same instant fails because earlier orders hold the shares
+    # ("insufficient qty available"), so we sum the tranche quantities instead.
+    desired = pstate.original_qty * params.sell_tranche_pct * len(qualifying)
+    sell_qty = min(desired, available)
+    if sell_qty <= 0:
+        return
+
+    multi = len(qualifying) > 1
+    tranche_nums = ", ".join(str(i + 1) for i in qualifying)
+    step_labels = ", ".join(f"+{steps[i] * 100:.1f}%" for i in qualifying)
+    reason = (
+        f"tranche{'s' if multi else ''} {tranche_nums} of {len(steps)} at "
+        f"+{gain * 100:.1f}% gain (step trigger{'s' if multi else ''} {step_labels})"
+    )
+    order = svc.submit_sell_qty(ticker, sell_qty)
+    realized = (price - entry) * sell_qty
+    pstate.realized_pnl = (pstate.realized_pnl or 0.0) + realized
+    db.add(Trade(
+        ticker=ticker, side="sell", quantity=round(sell_qty, 6), price=price,
+        order_id=order["id"], trigger_reason=reason, params_snapshot=snapshot,
+        realized_pnl=round(realized, 2), timestamp=utcnow(),
+    ))
+    executed.extend(qualifying)
+    pstate.tranches_executed = executed
+    db.commit()
+    summary["sells"].append({
+        "ticker": ticker, "qty": round(sell_qty, 6),
+        "realized_pnl": round(realized, 2), "reason": reason,
+    })
+
+    # close position state if all tranches done
     if len(executed) >= len(steps) and steps:
         pstate.status = "closed"
         pstate.closed_at = utcnow()

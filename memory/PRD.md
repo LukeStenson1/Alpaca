@@ -52,3 +52,15 @@ engine proposes threshold changes (PENDING, manual approve/reject, no auto-apply
      - server._migrate(): additive SQLite ALTER for new columns
      - UI: Overview "Realized P&L" stat + "Closed Positions" table; Trade History realized-P&L column
 - Email/SMS alerting kept DEFERRED per user (dashboard alerts only).
+
+## Update (2026-06-30, session 3) — Extensive paper testing
+- Built /app/backend/tests/paper_e2e.py: 21-check live paper harness (flattens account first, cleans up after).
+- RESULT: 21/21 passing. Covers: forced buy + trade log + position_state; no re-buy at per-ticker cap;
+  multi-tranche sell -> FULL CLOSE + realized P&L + closed-position record + pnl summary; global exposure cap;
+  max-daily-loss auto-engaging kill switch + critical alert; manual kill switch halt; suggestion engine
+  generate + approve applies to parameters.
+- BUG FOUND & FIXED: when price clears multiple sell steps in one run, placing sequential market sells
+  triggered Alpaca "insufficient qty / wash trade" rejects (shares held by the first order). Fixed in
+  strategy._evaluate_sells by AGGREGATING all qualifying tranches into a SINGLE sell order
+  (reason e.g. "tranches 1, 2 of 4 at +X% gain"). Verified via the harness (full close in one run).
+- Account left flat & clean; mode=paper; live still gated behind typed "CONFIRM LIVE".

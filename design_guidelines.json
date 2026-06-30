@@ -1,139 +1,73 @@
 {
-  "theme": "light",
-  "archetype": "4 (Swiss & High-Contrast)",
-  "brand_identity": {
-    "vibe": "Objective, rigid, functional, high-clarity. A 'terminal' evolution that feels like a professional command center.",
-    "core_principles": [
-      "The North Star Metric: Only show the most critical data at a glance.",
-      "Progressive Disclosure: Hide complexity behind tabs or settings; default to presets.",
-      "Functional Color: Klein blue for action, Red/Green for status, Monochrome for structure.",
-      "Tabular Precision: Monospace fonts for all numbers to ensure vertical alignment and quick scanning."
-    ]
+  "theme": "Dark Premium Fintech",
+  "archetype": "High-Contrast & Swiss Brutalist (Dark Variant)",
+  "global_rules": {
+    "emotion": "Calm, objective, authoritative, completely free of noise.",
+    "background": "Solid dark surfaces. NO gradients. NO purple or teal. Pure focus on data.",
+    "borders": "Crisp 1px borders using neutral zinc/slate. No heavy soft shadows."
   },
-  "colors": {
-    "background": "#FFFFFF",
-    "surface": "#F9FAFB",
-    "surface_hover": "#F3F4F6",
-    "border": "#E5E7EB",
-    "border_focus": "#002FA7",
-    "primary": {
-      "DEFAULT": "#002FA7",
-      "hover": "#00227A",
-      "light": "#E6EBF6"
-    },
-    "text": {
-      "primary": "#0A0A0A",
-      "secondary": "#4B5563",
-      "tertiary": "#9CA3AF"
-    },
-    "status": {
-      "gain": "#059669",
-      "gain_bg": "#D1FAE5",
-      "loss": "#DC2626",
-      "loss_bg": "#FEE2E2",
-      "warning": "#D97706",
-      "warning_bg": "#FEF3C7",
-      "paper_mode": "#002FA7",
-      "live_mode": "#DC2626"
-    }
+  "css_variables": {
+    "--bg-app": "#09090b",
+    "--bg-surface": "#18181b",
+    "--bg-surface-hover": "#27272a",
+    "--border-subtle": "#27272a",
+    "--border-strong": "#3f3f46",
+    "--text-primary": "#fafafa",
+    "--text-secondary": "#a1a1aa",
+    "--text-tertiary": "#52525b",
+    "--profit-text": "#34d399",
+    "--profit-bg": "rgba(52, 211, 153, 0.1)",
+    "--loss-text": "#fb7185",
+    "--loss-bg": "rgba(251, 113, 133, 0.1)",
+    "--live-mode": "#10b981",
+    "--paper-mode": "#f59e0b"
   },
   "typography": {
-    "font_families": {
-      "heading": "Cabinet Grotesk, sans-serif",
-      "body": "IBM Plex Sans, sans-serif",
-      "mono": "IBM Plex Mono, monospace"
+    "headings": {
+      "family": "Manrope, sans-serif",
+      "classes": "font-sans tracking-tight text-zinc-50"
     },
-    "scale": {
-      "h1": "text-4xl sm:text-5xl tracking-tight font-medium",
-      "h2": "text-2xl sm:text-3xl tracking-tight font-medium",
-      "h3": "text-xl font-medium",
-      "h4": "text-lg font-medium",
-      "body": "text-base leading-relaxed",
-      "small": "text-sm text-secondary",
-      "mono_large": "text-4xl sm:text-5xl font-mono tracking-tight",
-      "mono_medium": "text-xl font-mono",
-      "mono_small": "text-sm font-mono",
-      "overline": "text-xs font-mono uppercase tracking-[0.2em] text-secondary"
+    "body": {
+      "family": "Manrope, sans-serif",
+      "classes": "text-sm text-zinc-400"
+    },
+    "numbers_and_data": {
+      "family": "IBM Plex Mono, monospace",
+      "classes": "font-mono tracking-tight",
+      "usage": "MANDATORY for all P&L, stock prices, percentages, and tabular data. Align right."
     }
   },
-  "spacing_and_layout": {
-    "container": "max-w-7xl mx-auto px-6 lg:px-8",
-    "section_gap": "gap-8 lg:gap-12",
-    "card_padding": "p-6 lg:p-8",
-    "grid_bento": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6"
+  "layout_blueprint": {
+    "shell": {
+      "sidebar": "w-64 fixed left-0 top-0 h-screen border-r border-zinc-800 bg-zinc-950 p-4 flex flex-col gap-6",
+      "header": "fixed top-0 left-64 right-0 h-16 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md z-40 flex justify-between items-center px-6",
+      "main_content": "ml-64 mt-16 p-8 min-h-screen bg-zinc-950"
+    },
+    "sections": {
+      "1_dashboard": "Grid bento layout. Top row: 4 stat cards (Equity, Today P&L, Realized P&L, Buying Power). Middle row: Wide chart (P&L Recharts) + Small 'Portfolio Review Flags' list. Bottom row: Open positions table.",
+      "2_research": "Tabs layout (Watchlist | Influencer Ideas). Watchlist: Table with conviction stars (1-5), ticker, thesis text truncation. Influencer Ideas: Masonry/Grid of Idea Cards (Ticker, Channel, Bull/Bear badge, AI Thesis).",
+      "3_settings": "Max width 3xl centered container. Sections split by dividers. Trading Mode toggle (requires typed 'CONFIRM LIVE'). Presets: 3 large selectable cards (Conservative/Balanced/Aggressive). Automation Scheduler: Simple cron-like dropdowns.",
+      "4_history": "Tabs (Trade History | P&L Reports). Trade history table with pagination. Reports: Recharts line chart benchmarking account vs SPY."
+    }
   },
   "components": {
-    "card": {
-      "style": "bg-white border border-border rounded-none sm:rounded-sm",
-      "interaction": "hover:shadow-sm hover:border-border_focus transition-all duration-200"
-    },
-    "button": {
-      "primary": "bg-primary text-white font-medium px-4 py-2 rounded-sm hover:bg-primary/90 transition-colors",
-      "secondary": "bg-surface border border-border text-primary px-4 py-2 rounded-sm hover:bg-surface_hover transition-colors",
-      "kill_switch": "bg-white border-2 border-status-loss text-status-loss font-mono uppercase tracking-widest px-4 py-2 hover:bg-status-loss hover:text-white transition-colors"
-    },
-    "table": {
-      "style": "w-full text-left border-collapse",
-      "header": "border-b-2 border-primary text-sm font-mono text-secondary uppercase pb-2",
-      "row": "border-b border-border hover:bg-surface/50 transition-colors",
-      "cell": "py-3 text-base text-primary font-mono"
-    },
-    "badge": {
-      "style": "inline-flex items-center px-2 py-1 text-xs font-mono uppercase border rounded-sm",
-      "paper": "border-primary text-primary bg-primary/5",
-      "live": "border-status-loss text-status-loss bg-status-loss/5",
-      "gain": "text-status-gain bg-status-gain_bg border-transparent",
-      "loss": "text-status-loss bg-status-loss_bg border-transparent"
-    },
-    "input": {
-      "style": "w-full bg-white border border-border px-3 py-2 rounded-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm"
-    }
+    "card": "bg-zinc-900 border border-zinc-800 rounded-lg p-5 overflow-hidden",
+    "stat_tile": "flex flex-col gap-1. Label: text-xs font-semibold text-zinc-500 uppercase tracking-wider. Value: text-3xl font-mono text-zinc-50.",
+    "button_primary": "bg-zinc-50 text-zinc-950 hover:bg-zinc-200 font-medium px-4 py-2 rounded-md transition-colors",
+    "button_danger_kill_switch": "bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white px-4 py-2 rounded-md font-bold uppercase tracking-widest text-xs transition-all",
+    "badge_bull": "bg-emerald-400/10 text-emerald-400 border border-emerald-400/20 px-2 py-0.5 rounded text-xs font-mono uppercase",
+    "badge_bear": "bg-rose-400/10 text-rose-400 border border-rose-400/20 px-2 py-0.5 rounded text-xs font-mono uppercase",
+    "table": "w-full text-left text-sm. Th: border-b border-zinc-800 pb-2 text-zinc-500 font-medium. Td: py-3 border-b border-zinc-800/50 text-zinc-300.",
+    "tabs": "flex space-x-6 border-b border-zinc-800 mb-6. Active: border-b-2 border-zinc-50 text-zinc-50 pb-2. Inactive: text-zinc-500 hover:text-zinc-300 pb-2.",
+    "inputs": "bg-zinc-950 border border-zinc-800 text-zinc-50 placeholder-zinc-600 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 rounded-md px-3 py-2"
   },
-  "icons": {
-    "library": "lucide-react",
-    "usage": "Use crisp, 1.5px stroke icons. Keep icon sizes consistent (w-5 h-5 for inline, w-4 h-4 for dense tables)."
-  },
-  "layouts": {
-    "persistent_header": {
-      "structure": "Flex container, sticky top-0, z-50. Glassmorphism: backdrop-blur-xl bg-white/80 border-b border-border.",
-      "left": "Brand Logo (Text), Connection Status (Green dot + mono text).",
-      "middle": "Primary Navigation (Dashboard, Research, Configuration, History) with active states.",
-      "right": "Kill Switch Button, Alerts Bell (with unread count badge), Paper/Live mode badge."
-    },
-    "dashboard": {
-      "structure": "Control Room Grid. Dense, data-heavy, scannable.",
-      "top_row": "Account Equity (col-span-1 md:col-span-2) + Today's P&L (col-span-1) + Realized P&L (col-span-1). Use mono_large for primary numbers.",
-      "middle_row": "Portfolio Review Flags (col-span-full) - highlighted warnings for concentration/staleness.",
-      "bottom_row": "Open Positions Table (col-span-full). Minimalist table style."
-    },
-    "research_hub": {
-      "structure": "Tabbed view to combine Watchlist and Influencer Ideas.",
-      "tabs": "Minimalist underline tabs.",
-      "watchlist_view": "Table format: Ticker, Name, 1-5 Stars (Conviction), Active Toggle, Add/Remove actions.",
-      "influencer_ideas_view": "Bento Grid of Cards. Top section has 'Scan Now' button and YouTube channel tracking list. Below are AI-extracted idea cards: Ticker, Bull/Bear badge, Conviction, Thesis snippet."
-    },
-    "configuration": {
-      "structure": "Progressive disclosure layout. Split into High-Level Presets and Plain-English Advanced Controls.",
-      "top_section": "Trading Mode Toggle (Paper/Live) requiring typed confirmation ('LIVE').",
-      "presets": "3 large cards: Conservative, Balanced, Aggressive. Single click selects all parameters.",
-      "advanced_controls": "Accordion or list of settings written in plain English (e.g., 'Buy the dip when stock drops by [ X ] %').",
-      "safety_limits": "Max daily loss, Max exposure inputs (font-mono). Automation scheduler."
-    },
-    "history": {
-      "structure": "Tabbed view: Trade History vs P&L Reports.",
-      "trade_history": "Dense table of past trades. Mono fonts for numbers, reason for trigger.",
-      "pnl_reports": "Rollup summary cards (Monthly/Quarterly) and benchmark comparison vs SPY."
-    }
-  },
-  "instructions_to_main_agent": [
-    "Strictly adhere to the 'Cabinet Grotesk' for headings and 'IBM Plex Mono' for all numbers, tables, and settings inputs. This sells the 'terminal' vibe.",
-    "Do not use generic Shadcn rounded cards. Override border-radius to 'rounded-none' or 'rounded-sm' (max 2px).",
-    "Use the exact Klein Blue (#002FA7) for primary actions and active states.",
-    "Never use background colors for sections (e.g., no gray backgrounds for the whole page). Use pure white background and define areas with 1px borders (#E5E7EB).",
-    "Add data-testid attributes to all buttons, inputs, tabs, and table rows (e.g., data-testid='kill-switch', data-testid='nav-dashboard').",
-    "Avoid unnecessary icons in tables; rely on typography, alignment, and color (Red/Green) for scannability.",
-    "Implement 'Glassmorphism' (Crystal variant: bg-white/80, backdrop-blur-xl, 1px border-b) exclusively for the persistent header.",
-    "Settings should feel like filling in the blanks of a sentence (plain English controls) rather than a dense form of disjointed labels."
-  ],
-  "image_urls": []
+  "testing_requirements": {
+    "data_testid_rule": "All interactive and key informational elements MUST include a data-testid attribute.",
+    "examples": [
+      "data-testid='kill-switch-btn'",
+      "data-testid='stat-card-equity'",
+      "data-testid='nav-link-dashboard'",
+      "data-testid='preset-btn-aggressive'"
+    ]
+  }
 }

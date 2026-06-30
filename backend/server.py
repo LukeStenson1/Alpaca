@@ -11,7 +11,7 @@ from sqlalchemy import desc
 from database import Base, engine, get_db, SessionLocal
 from models import (
     Watchlist, Parameters, Trade, PositionState, Suggestion,
-    AccountSnapshot, Alert, SystemState,
+    AccountSnapshot, Alert, SystemState, GlobalStrategy,
 )
 from alpaca_service import get_service
 import strategy
@@ -48,7 +48,9 @@ def _migrate():
             ("range_pct", "FLOAT DEFAULT 0.15"), ("allow_downtrend_buys", "BOOLEAN DEFAULT 0"),
             ("cooldown_days", "INTEGER DEFAULT 7"),
         ],
-        "watchlist": [("sector", "VARCHAR"), ("name", "VARCHAR")],
+        "watchlist": [("sector", "VARCHAR"), ("name", "VARCHAR"),
+                      ("conviction", "INTEGER DEFAULT 3"), ("thesis", "TEXT"),
+                      ("next_earnings_date", "VARCHAR")],
         "system_state": [
             ("schedule_frequency", "VARCHAR DEFAULT 'daily'"),
             ("schedule_timing", "VARCHAR DEFAULT 'before_open'"),
@@ -76,12 +78,36 @@ def _migrate():
 class WatchlistCreate(BaseModel):
     ticker: str
     notes: Optional[str] = None
+    conviction: Optional[int] = None
+    thesis: Optional[str] = None
+    next_earnings_date: Optional[str] = None
 
 
 class WatchlistUpdate(BaseModel):
     active: Optional[bool] = None
     notes: Optional[str] = None
     sector: Optional[str] = None
+    conviction: Optional[int] = None
+    thesis: Optional[str] = None
+    next_earnings_date: Optional[str] = None
+
+
+class GlobalStrategyBody(BaseModel):
+    buy_threshold_stddev: Optional[float] = None
+    lookback_days: Optional[int] = None
+    sell_tranche_pct: Optional[float] = None
+    sell_gain_steps: Optional[List[float]] = None
+    max_position_size_usd: Optional[float] = None
+    stop_loss_pct: Optional[float] = None
+    cooldown_days: Optional[int] = None
+    max_hold_days: Optional[int] = None
+    use_52w_range: Optional[bool] = None
+    range_pct: Optional[float] = None
+    allow_downtrend_buys: Optional[bool] = None
+    use_volatility_sizing: Optional[bool] = None
+    investing_style: Optional[str] = None
+    min_conviction_to_buy: Optional[int] = None
+    earnings_blackout_days: Optional[int] = None
 
 
 class ParametersUpdate(BaseModel):
@@ -129,6 +155,9 @@ def on_startup():
         state = db.query(SystemState).get(1)
         if not state:
             db.add(SystemState(id=1))
+            db.commit()
+        if not db.query(GlobalStrategy).get(1):
+            db.add(GlobalStrategy(id=1))
             db.commit()
         # seed a starter watchlist if empty
         if db.query(Watchlist).count() == 0:
@@ -470,6 +499,50 @@ def reports_pnl(period: str = "month", db: Session = Depends(get_db)):
             "current_unrealized": unrealized}
 
 
+@app.get("/api/strategy/config")
+def get_strategy_config(db: Session = Depends(get_db)):
+    g = db.query(GlobalStrategy).get(1)
+    if not g:
+        g = GlobalStrategy(id=1)
+        db.add(g)
+        db.commit()
+        db.refresh(g)
+    return {
+        "buy_threshold_stddev": g.buy_threshold_stddev,
+        "lookback_days": g.lookback_days,
+        "sell_tranche_pct": g.sell_tranche_pct,
+        "sell_gain_steps": g.sell_gain_steps,
+        "max_position_size_usd": g.max_position_size_usd,
+        "stop_loss_pct": g.stop_loss_pct,
+        "cooldown_days": g.cooldown_days,
+        "max_hold_days": g.max_hold_days,
+        "use_52w_range": g.use_52w_range,
+        "range_pct": g.range_pct,
+        "allow_downtrend_buys": g.allow_downtrend_buys,
+        "use_volatility_sizing": g.use_volatility_sizing,
+        "investing_style": g.investing_style,
+        "min_conviction_to_buy": g.min_conviction_to_buy,
+        "earnings_blackout_days": g.earnings_blackout_days,
+        "updated_at": g.updated_at.isoformat() if g.updated_at else None,
+    }
+
+
+@app.put("/api/strategy/config")
+def update_strategy_config(body: GlobalStrategyBody, db: Session = Depends(get_db)):
+    g = db.query(GlobalStrategy).get(1)
+    if not g:
+        g = GlobalStrategy(id=1)
+        db.add(g)
+    data = body.model_dump(exclude_unset=True)
+    if "sell_gain_steps" in data and data["sell_gain_steps"] is not None:
+        data["sell_gain_steps"] = sorted([float(x) for x in data["sell_gain_steps"]])
+    for k, v in data.items():
+        setattr(g, k, v)
+    g.updated_at = utcnow()
+    db.commit()
+    return get_strategy_config(db)
+
+
 # ---------------- watchlist + parameters ----------------
 def params_dict(p: Parameters):
     return {
@@ -502,6 +575,9 @@ def list_watchlist(db: Session = Depends(get_db)):
             "active": w.active,
             "notes": w.notes,
             "sector": w.sector,
+            "conviction": w.conviction if w.conviction is not None else 3,
+            "thesis": w.thesis,
+            "next_earnings_date": w.next_earnings_date,
             "parameters": params_dict(p) if p else None,
         })
     return out
@@ -541,7 +617,10 @@ def add_watchlist(body: WatchlistCreate, db: Session = Depends(get_db)):
         raise HTTPException(400, f"'{tk}' is not a recognized symbol on Alpaca. Please check the spelling.")
     if not asset["tradable"]:
         raise HTTPException(400, f"'{tk}' exists but is not tradable on Alpaca.")
-    db.add(Watchlist(ticker=tk, name=asset["name"], notes=body.notes, active=True, date_added=utcnow()))
+    db.add(Watchlist(ticker=tk, name=asset["name"], notes=body.notes, active=True,
+                     date_added=utcnow(),
+                     conviction=body.conviction if body.conviction is not None else 3,
+                     thesis=body.thesis, next_earnings_date=body.next_earnings_date))
     db.add(Parameters(ticker=tk))
     db.commit()
     return {"ticker": tk, "name": asset["name"], "status": "added"}
@@ -558,8 +637,15 @@ def update_watchlist(ticker: str, body: WatchlistUpdate, db: Session = Depends(g
         w.notes = body.notes
     if body.sector is not None:
         w.sector = body.sector.strip() or None
+    if body.conviction is not None:
+        w.conviction = max(1, min(5, int(body.conviction)))
+    if body.thesis is not None:
+        w.thesis = body.thesis or None
+    if body.next_earnings_date is not None:
+        w.next_earnings_date = body.next_earnings_date.strip() or None
     db.commit()
-    return {"ticker": w.ticker, "active": w.active, "notes": w.notes, "sector": w.sector}
+    return {"ticker": w.ticker, "active": w.active, "notes": w.notes, "sector": w.sector,
+            "conviction": w.conviction, "thesis": w.thesis, "next_earnings_date": w.next_earnings_date}
 
 
 @app.delete("/api/watchlist/{ticker}")

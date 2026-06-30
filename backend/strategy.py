@@ -13,13 +13,23 @@ from datetime import datetime, timezone
 import statistics
 
 from models import (
-    Watchlist, Parameters, Trade, PositionState, AccountSnapshot, Alert, SystemState
+    Watchlist, Parameters, Trade, PositionState, AccountSnapshot, Alert, SystemState, GlobalStrategy
 )
 from alpaca_service import get_service
 
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+def get_global(db):
+    g = db.query(GlobalStrategy).get(1)
+    if not g:
+        g = GlobalStrategy(id=1)
+        db.add(g)
+        db.commit()
+        db.refresh(g)
+    return g
 
 
 def log_alert(db, type_, message, severity="info"):
@@ -110,11 +120,10 @@ def run_strategy(db, manual=False):
 
     total_exposure = sum(p["market_value"] for p in positions.values())
 
+    gconf = get_global(db)
     active = db.query(Watchlist).filter(Watchlist.active == True).all()  # noqa: E712
     for w in active:
-        params = db.query(Parameters).get(w.ticker)
-        if not params:
-            continue
+        params = gconf  # one global config applies to every stock
         snapshot = _params_snapshot(params)
 
         pstate = db.query(PositionState).filter(
@@ -132,9 +141,9 @@ def run_strategy(db, manual=False):
                 summary["errors"].append(f"{w.ticker} sell error: {e}")
                 log_alert(db, "order_failure", f"{w.ticker} sell failed: {e}", "warning")
 
-        # 3: buy
+        # 3: buy (with conviction + earnings gates)
         try:
-            _evaluate_buy(db, svc, w.ticker, params, snapshot, positions,
+            _evaluate_buy(db, svc, w, params, snapshot, positions,
                           total_exposure, state, summary)
             total_exposure = sum(p["market_value"] for p in positions.values())
         except Exception as e:
@@ -209,7 +218,30 @@ def _check_stop_loss(db, svc, ticker, params, snapshot, pstate, pos, summary):
     return True
 
 
-def _evaluate_buy(db, svc, ticker, params, snapshot, positions, total_exposure, state, summary):
+def _evaluate_buy(db, svc, w, params, snapshot, positions, total_exposure, state, summary):
+    ticker = w.ticker
+
+    # conviction gate (manual quality/influencer rating)
+    conviction = w.conviction if w.conviction is not None else 3
+    if conviction < (params.min_conviction_to_buy or 0):
+        summary["skipped"].append(
+            f"{ticker}: skipped — conviction {conviction}/5 below minimum "
+            f"{params.min_conviction_to_buy}/5")
+        return
+
+    # earnings blackout gate
+    if w.next_earnings_date and params.earnings_blackout_days:
+        try:
+            ed = datetime.strptime(w.next_earnings_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            days_to = (ed - utcnow()).days
+            if 0 <= days_to <= params.earnings_blackout_days:
+                summary["skipped"].append(
+                    f"{ticker}: skipped — earnings in {days_to}d "
+                    f"(blackout {params.earnings_blackout_days}d)")
+                return
+        except ValueError:
+            pass
+
     need = max(params.lookback_days, 200, 252) + 5
     bars = svc.get_daily_bars(ticker, need)
     closes = [b["close"] for b in bars]

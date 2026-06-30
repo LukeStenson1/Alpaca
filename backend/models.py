@@ -17,6 +17,9 @@ class Watchlist(Base):
     notes = Column(Text, nullable=True)
     sector = Column(String, nullable=True)
     name = Column(String, nullable=True)  # company name from Alpaca asset lookup
+    conviction = Column(Integer, default=3)  # 1-5 manual conviction (influencer/quality)
+    thesis = Column(Text, nullable=True)     # why you own it
+    next_earnings_date = Column(String, nullable=True)  # YYYY-MM-DD (manual for now)
 
 
 class Parameters(Base):
@@ -115,4 +118,27 @@ class SystemState(Base):
     baseline_volatility = Column(Float, default=0.02)      # for volatility-adjusted sizing
     benchmark_ticker = Column(String, default="SPY")
     rebalance_threshold_pct = Column(Float, default=0.20)  # flag if a position exceeds this share
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class GlobalStrategy(Base):
+    """Singleton (id=1) — one strategy config applied to ALL stocks."""
+    __tablename__ = "global_strategy"
+    id = Column(Integer, primary_key=True)
+    buy_threshold_stddev = Column(Float, default=2.0)
+    lookback_days = Column(Integer, default=150)
+    sell_tranche_pct = Column(Float, default=0.25)
+    sell_gain_steps = Column(JSON, default=lambda: [0.10, 0.20, 0.35, 0.50])
+    max_position_size_usd = Column(Float, default=1000.0)
+    stop_loss_pct = Column(Float, default=0.20)
+    cooldown_days = Column(Integer, default=14)
+    max_hold_days = Column(Integer, nullable=True)
+    use_52w_range = Column(Boolean, default=True)
+    range_pct = Column(Float, default=0.30)
+    allow_downtrend_buys = Column(Boolean, default=False)
+    use_volatility_sizing = Column(Boolean, default=True)
+    # long-term / quality shift
+    investing_style = Column(String, default="blended")  # longterm / blended / tactical
+    min_conviction_to_buy = Column(Integer, default=3)   # only buy names rated >= this
+    earnings_blackout_days = Column(Integer, default=5)  # don't buy within N days of earnings
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)

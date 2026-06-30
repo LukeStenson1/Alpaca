@@ -74,3 +74,15 @@ engine proposes threshold changes (PENDING, manual approve/reject, no auto-apply
 - NOTE: redesigned param-editor EXPANSION not yet confirmed via automated screenshot (tool couldn't drive the click;
   no console errors, component compiles). Frontend v2 UI persistence (param save, Settings long-term, Reports) also
   still PENDING authoritative automated verification (testing agent stopped before running).
+
+## Update (2026-06-30, session 5) — Global settings + long-term/conviction shift (foundation)
+User choices: 1a global settings (all stocks), 2c blended long-term+tactical, 3d I pick fundamentals provider (-> Finnhub, key pending), 4c manual influencer weighting, 5b auto-trade allowed on high conviction. Extras: conviction score + earnings-date awareness.
+DONE (key-independent, tested):
+- New GlobalStrategy singleton table + GET/PUT /api/strategy/config — ONE rule set for all stocks (per-ticker Parameters now unused by engine).
+- Watchlist per-stock: conviction (1-5), thesis, next_earnings_date, sector (migration added). 
+- strategy.run uses global config; added BUY gates: conviction < min_conviction_to_buy -> skip; within earnings_blackout_days of next_earnings_date -> skip. Both verified via curl.
+- Frontend: new Strategy page (friendly global config + presets + investing style), Watchlist redesigned (conviction stars, thesis, earnings, sector; strategy fields removed). Defaults shifted long-term (stop 20%, steps [.10,.20,.35,.50], 52w-gate on, lookback 150).
+PENDING (needs FINNHUB API key + integration_playbook_expert call, next session):
+- Fundamentals-based conviction enrichment, Alpaca/Yahoo news layer + sentiment, AUTO-POPULATE earnings dates (currently manual), optional auto-trade on high conviction (5b) with safety caps.
+- Cleanup: remove junk 'KDSDF' watchlist entry.
+- Frontend automated verification (Strategy save / Watchlist conviction save / Reports / Settings persistence) still not run via testing agent.

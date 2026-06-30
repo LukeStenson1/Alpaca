@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, ListChecks, History, Lightbulb, Settings as SettingsIcon,
-  Power, Bell, Activity, ShieldAlert, BarChart3, Target, Youtube,
+  LayoutDashboard, History, Settings as SettingsIcon,
+  Power, Bell, Activity, ShieldAlert, BarChart3, Target, Telescope,
 } from "lucide-react";
 import client from "../api";
 import { useSystem } from "./SystemContext";
@@ -11,11 +11,9 @@ import { Badge } from "./ui";
 
 const nav = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true, testid: "nav-overview" },
-  { to: "/watchlist", label: "Watchlist", icon: ListChecks, testid: "nav-watchlist" },
+  { to: "/research", label: "Research", icon: Telescope, testid: "nav-research" },
   { to: "/strategy", label: "Strategy", icon: Target, testid: "nav-strategy" },
   { to: "/trades", label: "Trade History", icon: History, testid: "nav-trades" },
-  { to: "/suggestions", label: "Suggestions", icon: Lightbulb, testid: "nav-suggestions" },
-  { to: "/influencers", label: "Influencer Ideas", icon: Youtube, testid: "nav-influencers" },
   { to: "/reports", label: "P&L Reports", icon: BarChart3, testid: "nav-reports" },
   { to: "/settings", label: "Settings", icon: SettingsIcon, testid: "nav-settings" },
 ];

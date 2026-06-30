@@ -1,58 +1,139 @@
 {
   "theme": "light",
   "archetype": "4 (Swiss & High-Contrast)",
-  "concept": "The Terminal. A high-precision, low-noise algorithmic trading control room focusing on data density, authority, and functional clarity.",
-  "typography": {
-    "headings": "IBM Plex Sans",
-    "body": "IBM Plex Sans",
-    "mono": "JetBrains Mono",
-    "scale_rules": "H1 max text-4xl. Use tracking-tight for headings to maintain a technical feel. Critical: ALL numeric data, stock tickers, P&L, and strategy parameters must use the monospace font (font-mono) and tabular-nums to prevent layout shifting during live updates."
+  "brand_identity": {
+    "vibe": "Objective, rigid, functional, high-clarity. A 'terminal' evolution that feels like a professional command center.",
+    "core_principles": [
+      "The North Star Metric: Only show the most critical data at a glance.",
+      "Progressive Disclosure: Hide complexity behind tabs or settings; default to presets.",
+      "Functional Color: Klein blue for action, Red/Green for status, Monochrome for structure.",
+      "Tabular Precision: Monospace fonts for all numbers to ensure vertical alignment and quick scanning."
+    ]
   },
   "colors": {
-    "background": "#F4F4F5",
-    "surface": "#FFFFFF",
-    "text_primary": "#09090B",
-    "text_secondary": "#71717A",
-    "accents": {
-      "primary": "#002FA7",
-      "kill_switch_danger": "#DC2626",
-      "warning_suggestions": "#D97706",
-      "profit_positive": "#16A34A",
-      "loss_negative": "#DC2626"
+    "background": "#FFFFFF",
+    "surface": "#F9FAFB",
+    "surface_hover": "#F3F4F6",
+    "border": "#E5E7EB",
+    "border_focus": "#002FA7",
+    "primary": {
+      "DEFAULT": "#002FA7",
+      "hover": "#00227A",
+      "light": "#E6EBF6"
     },
-    "rules": "Strict adherence to high contrast. Do not use soft shadows or glassmorphism. Surfaces should be defined by crisp 1px borders (border-zinc-200)."
+    "text": {
+      "primary": "#0A0A0A",
+      "secondary": "#4B5563",
+      "tertiary": "#9CA3AF"
+    },
+    "status": {
+      "gain": "#059669",
+      "gain_bg": "#D1FAE5",
+      "loss": "#DC2626",
+      "loss_bg": "#FEE2E2",
+      "warning": "#D97706",
+      "warning_bg": "#FEF3C7",
+      "paper_mode": "#002FA7",
+      "live_mode": "#DC2626"
+    }
   },
-  "layout": {
-    "strategy": "Control Room Grid",
-    "spacing_scale": "Dense. Use p-4 to p-6 inside cards. Grid gaps should be tight (gap-4 or gap-6).",
-    "structure": "Sidebar or top-nav for main sections (Overview, Watchlist, Trade History, Suggestions, Settings). Maximize screen real estate. Use a fluid grid for dashboard widgets."
+  "typography": {
+    "font_families": {
+      "heading": "Cabinet Grotesk, sans-serif",
+      "body": "IBM Plex Sans, sans-serif",
+      "mono": "IBM Plex Mono, monospace"
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl tracking-tight font-medium",
+      "h2": "text-2xl sm:text-3xl tracking-tight font-medium",
+      "h3": "text-xl font-medium",
+      "h4": "text-lg font-medium",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm text-secondary",
+      "mono_large": "text-4xl sm:text-5xl font-mono tracking-tight",
+      "mono_medium": "text-xl font-mono",
+      "mono_small": "text-sm font-mono",
+      "overline": "text-xs font-mono uppercase tracking-[0.2em] text-secondary"
+    }
+  },
+  "spacing_and_layout": {
+    "container": "max-w-7xl mx-auto px-6 lg:px-8",
+    "section_gap": "gap-8 lg:gap-12",
+    "card_padding": "p-6 lg:p-8",
+    "grid_bento": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6"
   },
   "components": {
-    "cards": "Flat design. 1px solid border (border-zinc-200), pure white background, zero shadow, max rounded-md.",
-    "tables": "Shadcn Table. Highly compact. Right-align all numeric columns. Apply font-mono and text-sm to table cells.",
-    "buttons": "Sharp, technical. Rounded-md or rounded-sm. The Kill Switch must be prominently red with a distinct visual weight.",
-    "forms": "Use Shadcn primitives. Inputs should have clear, stark borders (focus:ring-1 focus:ring-black).",
-    "charts": "Recharts. Monochrome lines with clean axes, utilizing green/red fills only for P&L visualization.",
-    "badges": "Used for statuses (Live vs Paper, Active vs Inactive). High-contrast solid fills."
+    "card": {
+      "style": "bg-white border border-border rounded-none sm:rounded-sm",
+      "interaction": "hover:shadow-sm hover:border-border_focus transition-all duration-200"
+    },
+    "button": {
+      "primary": "bg-primary text-white font-medium px-4 py-2 rounded-sm hover:bg-primary/90 transition-colors",
+      "secondary": "bg-surface border border-border text-primary px-4 py-2 rounded-sm hover:bg-surface_hover transition-colors",
+      "kill_switch": "bg-white border-2 border-status-loss text-status-loss font-mono uppercase tracking-widest px-4 py-2 hover:bg-status-loss hover:text-white transition-colors"
+    },
+    "table": {
+      "style": "w-full text-left border-collapse",
+      "header": "border-b-2 border-primary text-sm font-mono text-secondary uppercase pb-2",
+      "row": "border-b border-border hover:bg-surface/50 transition-colors",
+      "cell": "py-3 text-base text-primary font-mono"
+    },
+    "badge": {
+      "style": "inline-flex items-center px-2 py-1 text-xs font-mono uppercase border rounded-sm",
+      "paper": "border-primary text-primary bg-primary/5",
+      "live": "border-status-loss text-status-loss bg-status-loss/5",
+      "gain": "text-status-gain bg-status-gain_bg border-transparent",
+      "loss": "text-status-loss bg-status-loss_bg border-transparent"
+    },
+    "input": {
+      "style": "w-full bg-white border border-border px-3 py-2 rounded-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm"
+    }
   },
-  "motion": {
-    "rules": "Instant and functional. Avoid purely decorative motion. Use minimal opacity transitions for hovers. Skeleton loaders for data fetching."
+  "icons": {
+    "library": "lucide-react",
+    "usage": "Use crisp, 1.5px stroke icons. Keep icon sizes consistent (w-5 h-5 for inline, w-4 h-4 for dense tables)."
   },
-  "accessibility": {
-    "contrast": "Strict APCA/WCAG AA adherence. Avoid relying solely on red/green for profit/loss; include +/- prefixes.",
-    "testing": "MANDATORY: All interactive elements (buttons, links, form inputs, toggles) must include a data-testid attribute in kebab-case."
-  },
-  "media": {
-    "empty_state_graphic": "https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTB8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGdlb21ldHJpYyUyMG1pbmltYWwlMjBkYXRhfGVufDB8fHx8MTc4Mjg0NjQxNXww&ixlib=rb-4.1.0&q=85",
-    "usage": "Use this minimal abstract graphic purely for empty states (e.g., no pending suggestions, no open positions)."
+  "layouts": {
+    "persistent_header": {
+      "structure": "Flex container, sticky top-0, z-50. Glassmorphism: backdrop-blur-xl bg-white/80 border-b border-border.",
+      "left": "Brand Logo (Text), Connection Status (Green dot + mono text).",
+      "middle": "Primary Navigation (Dashboard, Research, Configuration, History) with active states.",
+      "right": "Kill Switch Button, Alerts Bell (with unread count badge), Paper/Live mode badge."
+    },
+    "dashboard": {
+      "structure": "Control Room Grid. Dense, data-heavy, scannable.",
+      "top_row": "Account Equity (col-span-1 md:col-span-2) + Today's P&L (col-span-1) + Realized P&L (col-span-1). Use mono_large for primary numbers.",
+      "middle_row": "Portfolio Review Flags (col-span-full) - highlighted warnings for concentration/staleness.",
+      "bottom_row": "Open Positions Table (col-span-full). Minimalist table style."
+    },
+    "research_hub": {
+      "structure": "Tabbed view to combine Watchlist and Influencer Ideas.",
+      "tabs": "Minimalist underline tabs.",
+      "watchlist_view": "Table format: Ticker, Name, 1-5 Stars (Conviction), Active Toggle, Add/Remove actions.",
+      "influencer_ideas_view": "Bento Grid of Cards. Top section has 'Scan Now' button and YouTube channel tracking list. Below are AI-extracted idea cards: Ticker, Bull/Bear badge, Conviction, Thesis snippet."
+    },
+    "configuration": {
+      "structure": "Progressive disclosure layout. Split into High-Level Presets and Plain-English Advanced Controls.",
+      "top_section": "Trading Mode Toggle (Paper/Live) requiring typed confirmation ('LIVE').",
+      "presets": "3 large cards: Conservative, Balanced, Aggressive. Single click selects all parameters.",
+      "advanced_controls": "Accordion or list of settings written in plain English (e.g., 'Buy the dip when stock drops by [ X ] %').",
+      "safety_limits": "Max daily loss, Max exposure inputs (font-mono). Automation scheduler."
+    },
+    "history": {
+      "structure": "Tabbed view: Trade History vs P&L Reports.",
+      "trade_history": "Dense table of past trades. Mono fonts for numbers, reason for trigger.",
+      "pnl_reports": "Rollup summary cards (Monthly/Quarterly) and benchmark comparison vs SPY."
+    }
   },
   "instructions_to_main_agent": [
-    "CRITICAL: The project uses .js/.jsx, NOT .tsx. All components must be written in JavaScript. Do not emit TypeScript syntax or types.",
-    "Install standard packages if missing: lucide-react for icons, recharts for sparklines.",
-    "Implement 5 core pages: Overview, Watchlist, Trade History, Suggestions, Settings.",
-    "The 'Kill Switch' must be accessible instantly, ideally housed in the persistent layout header.",
-    "Ensure 'Live Trading' toggle in Settings requires a typed 'CONFIRM LIVE' validation.",
-    "All tables (Positions, Watchlist, History) must utilize font-mono for data points to enforce the 'terminal' aesthetic.",
-    "Use data-testid on all key elements (e.g., data-testid='kill-switch', data-testid='watchlist-add-btn', data-testid='approve-suggestion-btn')."
-  ]
+    "Strictly adhere to the 'Cabinet Grotesk' for headings and 'IBM Plex Mono' for all numbers, tables, and settings inputs. This sells the 'terminal' vibe.",
+    "Do not use generic Shadcn rounded cards. Override border-radius to 'rounded-none' or 'rounded-sm' (max 2px).",
+    "Use the exact Klein Blue (#002FA7) for primary actions and active states.",
+    "Never use background colors for sections (e.g., no gray backgrounds for the whole page). Use pure white background and define areas with 1px borders (#E5E7EB).",
+    "Add data-testid attributes to all buttons, inputs, tabs, and table rows (e.g., data-testid='kill-switch', data-testid='nav-dashboard').",
+    "Avoid unnecessary icons in tables; rely on typography, alignment, and color (Red/Green) for scannability.",
+    "Implement 'Glassmorphism' (Crystal variant: bg-white/80, backdrop-blur-xl, 1px border-b) exclusively for the persistent header.",
+    "Settings should feel like filling in the blanks of a sentence (plain English controls) rather than a dense form of disjointed labels."
+  ],
+  "image_urls": []
 }

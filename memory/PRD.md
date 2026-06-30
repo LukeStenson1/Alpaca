@@ -86,3 +86,17 @@ PENDING (needs FINNHUB API key + integration_playbook_expert call, next session)
 - Fundamentals-based conviction enrichment, Alpaca/Yahoo news layer + sentiment, AUTO-POPULATE earnings dates (currently manual), optional auto-trade on high conviction (5b) with safety caps.
 - Cleanup: remove junk 'KDSDF' watchlist entry.
 - Frontend automated verification (Strategy save / Watchlist conviction save / Reports / Settings persistence) still not run via testing agent.
+
+## 2026-06-30 — Dark UI overhaul + YouTube engine + critical concurrency fix (DONE & tested)
+- ✅ **YouTube Influencer Ideas engine** (LIVE): youtube_service.py + influencers.py + /api/influencers/* endpoints. Tracks channels (seeded: Jeremy Lefebvre, BWB-Brian; editable in UI), fetches recent videos via YouTube Data API v3, extracts {ticker, signal, conviction, thesis} per video with Emergent LLM (gpt-5.4). Bullish + Alpaca-tradable picks auto-added to watchlist at low conviction (2); repeat mentions raise conviction (can clear auto-buy gate). New tables: influencer_channels, influencer_ideas. YOUTUBE_API_KEY + EMERGENT_LLM_KEY in backend/.env. Verified: scan returns real ideas (GLW/APH added from BWB; Jeremy's desc-only mentions correctly neutral/advisory).
+- ✅ **Nav consolidated 6 → 4**: Dashboard / Research (tabs: Watchlist + Influencer Ideas) / Settings (Trading mode + Strategy rules + Safety + Automation) / History (tabs: Trade History + P&L Reports). "Tuning Suggestions" REMOVED. Strategy merged into Settings. Legacy routes redirect.
+- ✅ **Full minimalist DARK redesign**: tailwind tokens + index.css (Manrope + IBM Plex Mono), rewritten ui.js components, dark Layout/header. Electric-blue (#3b82f6) accent, emerald/rose P&L, tabular mono numbers.
+- ✅ **CRITICAL FIX — dashboard hang/502**: root cause = SQLite QueuePool (5+10) exhausted while requests held DB sessions during slow/concurrent Alpaca calls (non-thread-safe shared client). Fix: alpaca_service RLock + TTL cache (_cached: account/positions 8s, clock 30s, bars 120s) + database.py poolclass=NullPool. Dashboard now ~0.5s, no 502s. Overview uses Promise.allSettled for resilience; axios timeout 30s.
+- Tested: testing_agent iteration_3 — backend 22/22, frontend 24/24 PASS. No open bugs.
+
+NEXT / BACKLOG:
+- P1: Fundamentals provider (FMP/Alpha Vantage/Finnhub) → P/E, growth, margins; "Conviction × Valuation" ranked shortlist on Dashboard.
+- P1: Transcript-based extraction (youtube-transcript-api) so spoken theses (e.g. Jeremy's) are captured, not just descriptions.
+- P2: refactor server.py (~900 lines) into routers; remove junk 'KDSDF' watchlist entry.
+- P2: weekly auto-scan scheduler for influencer ideas (currently manual "Scan Now").
+

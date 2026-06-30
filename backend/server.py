@@ -1,3 +1,4 @@
+import os
 import logging
 from datetime import datetime, timezone
 from typing import Optional, List
@@ -12,10 +13,12 @@ from database import Base, engine, get_db, SessionLocal
 from models import (
     Watchlist, Parameters, Trade, PositionState, Suggestion,
     AccountSnapshot, Alert, SystemState, GlobalStrategy,
+    InfluencerChannel, InfluencerIdea,
 )
 from alpaca_service import get_service
 import strategy
 import suggestions
+import influencers
 import scheduler
 
 logging.basicConfig(level=logging.INFO)
@@ -159,6 +162,7 @@ def on_startup():
         if not db.query(GlobalStrategy).get(1):
             db.add(GlobalStrategy(id=1))
             db.commit()
+        influencers.seed_default_channels(db)
         # seed a starter watchlist if empty
         if db.query(Watchlist).count() == 0:
             for tk in ["AAPL", "MSFT", "SPY"]:
@@ -791,6 +795,105 @@ def ack_all(db: Session = Depends(get_db)):
     db.query(Alert).filter(Alert.acknowledged == False).update({"acknowledged": True})  # noqa: E712
     db.commit()
     return {"status": "ok"}
+
+
+# ---------------- influencers (YouTube -> AI stock ideas) ----------------
+class InfluencerChannelBody(BaseModel):
+    query: str
+    name: Optional[str] = None
+
+
+def _channel_dict(c: InfluencerChannel):
+    return {
+        "id": c.id, "query": c.query, "name": c.name, "channel_id": c.channel_id,
+        "active": c.active,
+        "last_scanned_at": c.last_scanned_at.isoformat() if c.last_scanned_at else None,
+    }
+
+
+@app.get("/api/influencers/status")
+def influencer_status():
+    return {
+        "configured": influencers.keys_configured(),
+        "youtube_key": bool(os.environ.get("YOUTUBE_API_KEY")),
+        "llm_key": bool(os.environ.get("EMERGENT_LLM_KEY")),
+    }
+
+
+@app.get("/api/influencers/channels")
+def list_channels(db: Session = Depends(get_db)):
+    return [_channel_dict(c) for c in db.query(InfluencerChannel).order_by(InfluencerChannel.id).all()]
+
+
+@app.post("/api/influencers/channels")
+def add_channel(body: InfluencerChannelBody, db: Session = Depends(get_db)):
+    q = (body.query or "").strip()
+    if not q:
+        raise HTTPException(400, "query (channel handle or name) required")
+    c = InfluencerChannel(query=q, name=(body.name or q).strip(), active=True, created_at=utcnow())
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    return _channel_dict(c)
+
+
+@app.post("/api/influencers/channels/{cid}/toggle")
+def toggle_channel(cid: int, db: Session = Depends(get_db)):
+    c = db.query(InfluencerChannel).get(cid)
+    if not c:
+        raise HTTPException(404, "channel not found")
+    c.active = not c.active
+    db.commit()
+    return _channel_dict(c)
+
+
+@app.delete("/api/influencers/channels/{cid}")
+def delete_channel(cid: int, db: Session = Depends(get_db)):
+    c = db.query(InfluencerChannel).get(cid)
+    if not c:
+        raise HTTPException(404, "channel not found")
+    db.delete(c)
+    db.commit()
+    return {"id": cid, "status": "deleted"}
+
+
+@app.post("/api/influencers/scan")
+async def scan_influencers(db: Session = Depends(get_db)):
+    if not influencers.keys_configured():
+        raise HTTPException(400, "YouTube and/or LLM key not configured. Add YOUTUBE_API_KEY first.")
+    try:
+        return await influencers.scan_all(db)
+    except Exception as e:
+        logger.exception("influencer scan failed")
+        raise HTTPException(500, f"Scan failed: {e}")
+
+
+@app.get("/api/influencers/ideas")
+def list_ideas(status: Optional[str] = None, db: Session = Depends(get_db)):
+    q = db.query(InfluencerIdea)
+    if status:
+        q = q.filter(InfluencerIdea.status == status)
+    rows = q.order_by(desc(InfluencerIdea.created_at)).limit(300).all()
+    return [
+        {
+            "id": i.id, "channel_name": i.channel_name, "video_title": i.video_title,
+            "video_url": i.video_url, "published_at": i.published_at, "ticker": i.ticker,
+            "company": i.company, "signal": i.signal, "conviction": i.conviction,
+            "thesis": i.thesis, "action": i.action, "status": i.status,
+            "created_at": i.created_at.isoformat() if i.created_at else None,
+        }
+        for i in rows
+    ]
+
+
+@app.post("/api/influencers/ideas/{iid}/dismiss")
+def dismiss_idea(iid: int, db: Session = Depends(get_db)):
+    i = db.query(InfluencerIdea).get(iid)
+    if not i:
+        raise HTTPException(404, "idea not found")
+    i.status = "dismissed"
+    db.commit()
+    return {"id": iid, "status": "dismissed"}
 
 
 @app.get("/api/")

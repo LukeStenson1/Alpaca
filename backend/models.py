@@ -121,6 +121,37 @@ class SystemState(Base):
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 
+class InfluencerChannel(Base):
+    """A YouTube channel to scan for stock ideas."""
+    __tablename__ = "influencer_channels"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    query = Column(String)        # search query / handle used to resolve the channel
+    name = Column(String)         # display name
+    channel_id = Column(String, nullable=True)  # resolved YouTube channel id (cached)
+    active = Column(Boolean, default=True)
+    last_scanned_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+
+class InfluencerIdea(Base):
+    """A stock idea extracted by the LLM from an influencer's video."""
+    __tablename__ = "influencer_ideas"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    channel_name = Column(String)
+    video_id = Column(String, index=True)
+    video_title = Column(Text)
+    video_url = Column(String)
+    published_at = Column(String, nullable=True)
+    ticker = Column(String, index=True)
+    company = Column(String, nullable=True)
+    signal = Column(String)        # bull / bear / neutral
+    conviction = Column(Integer)   # 1-5 (LLM-assessed)
+    thesis = Column(Text)
+    action = Column(String)        # added / updated / advisory
+    status = Column(String, default="pending")  # pending / dismissed
+    created_at = Column(DateTime, default=utcnow)
+
+
 class GlobalStrategy(Base):
     """Singleton (id=1) — one strategy config applied to ALL stocks."""
     __tablename__ = "global_strategy"

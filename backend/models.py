@@ -39,6 +39,7 @@ class Trade(Base):
     order_id = Column(String, nullable=True)
     trigger_reason = Column(Text)
     params_snapshot = Column(JSON, nullable=True)
+    realized_pnl = Column(Float, nullable=True)  # set on sell tranches
 
 
 class PositionState(Base):
@@ -49,6 +50,8 @@ class PositionState(Base):
     avg_entry_price = Column(Float, default=0.0)
     tranches_executed = Column(JSON, default=lambda: [])  # list of step indices already sold
     opened_at = Column(DateTime, default=utcnow)
+    closed_at = Column(DateTime, nullable=True)
+    realized_pnl = Column(Float, default=0.0)
     status = Column(String, default="open")  # open / closed
 
 

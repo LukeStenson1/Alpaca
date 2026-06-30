@@ -41,3 +41,14 @@ engine proposes threshold changes (PENDING, manual approve/reject, no auto-apply
 - P2: Realized P&L per closed position; suggestion engine richer heuristics with more trade volume.
 - P2: Auth/lock screen if ever exposed publicly.
 - Reminder: extensive paper testing before any live use.
+
+## Update (2026-06-30, session 2)
+- ✅ Sell ladder validated LIVE on paper: real paper sell order fired (tranche 1/4 at +6.7%), tranche tracked
+     (no double-sell), realized P&L $15.68 logged. SPY tracking state afterward reset to reflect real holdings.
+- ✅ Realized P&L per closed position added:
+     - models: PositionState.realized_pnl + closed_at; Trade.realized_pnl
+     - strategy: accumulates realized on each sell tranche; sets closed_at on full close
+     - API: GET /api/positions/closed, GET /api/pnl/summary; realized_pnl in /api/trades
+     - server._migrate(): additive SQLite ALTER for new columns
+     - UI: Overview "Realized P&L" stat + "Closed Positions" table; Trade History realized-P&L column
+- Email/SMS alerting kept DEFERRED per user (dashboard alerts only).

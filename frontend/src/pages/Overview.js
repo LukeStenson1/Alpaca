@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { Play, RefreshCw, WifiOff } from "lucide-react";
-import client, { fmtUSD, fmtPct, fmtNum } from "../api";
+import client, { fmtUSD, fmtPct, fmtNum, fmtDate } from "../api";
 import { Card, CardHeader, Button, Stat, Spinner, EmptyState, Badge } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useSystem } from "../components/SystemContext";
@@ -14,19 +14,25 @@ export default function Overview() {
   const [account, setAccount] = useState(null);
   const [positions, setPositions] = useState([]);
   const [snaps, setSnaps] = useState([]);
+  const [pnl, setPnl] = useState(null);
+  const [closed, setClosed] = useState([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [a, p, s] = await Promise.all([
+      const [a, p, s, summary, c] = await Promise.all([
         client.get("/account"),
         client.get("/positions"),
         client.get("/account/snapshots", { params: { limit: 200 } }),
+        client.get("/pnl/summary"),
+        client.get("/positions/closed"),
       ]);
       setAccount(a.data);
       setPositions(p.data.positions || []);
       setSnaps(s.data || []);
+      setPnl(summary.data);
+      setClosed(c.data || []);
     } catch (e) {
       toast("Failed to load overview", "error");
     } finally {
@@ -108,7 +114,7 @@ export default function Overview() {
       {connected && (
         <>
           <Card>
-            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-zinc-200">
+            <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-zinc-200">
               <Stat label="Equity" value={fmtUSD(account.equity)} testid="stat-equity" />
               <Stat
                 label="Today's P&L"
@@ -116,6 +122,13 @@ export default function Overview() {
                 sub={fmtPct(account.today_pl_pct)}
                 tone={plTone}
                 testid="stat-today-pl"
+              />
+              <Stat
+                label="Realized P&L"
+                value={fmtUSD(pnl?.realized_total ?? 0)}
+                sub={`${pnl?.closed_count ?? 0} closed`}
+                tone={(pnl?.realized_total ?? 0) > 0 ? "profit" : (pnl?.realized_total ?? 0) < 0 ? "loss" : "default"}
+                testid="stat-realized-pl"
               />
               <Stat label="Cash" value={fmtUSD(account.cash)} testid="stat-cash" />
               <Stat label="Buying Power" value={fmtUSD(account.buying_power)} testid="stat-buying-power" />
@@ -176,6 +189,45 @@ export default function Overview() {
               </div>
             </Card>
           </div>
+
+          <Card data-testid="closed-positions-card">
+            <CardHeader title="Closed Positions — Realized P&L" subtitle={`${closed.length} fully closed`} />
+            {closed.length === 0 ? (
+              <EmptyState
+                title="No closed positions yet"
+                hint="A position closes once all its sell tranches have fired; realized P&L is recorded here."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" data-testid="closed-positions-table">
+                  <thead>
+                    <tr className="border-b border-zinc-200 text-[11px] uppercase tracking-wide text-zinc-500">
+                      <th className="text-left px-5 py-2.5 font-semibold">Ticker</th>
+                      <th className="text-right px-3 py-2.5 font-semibold">Qty</th>
+                      <th className="text-right px-3 py-2.5 font-semibold">Avg Entry</th>
+                      <th className="text-right px-3 py-2.5 font-semibold">Realized P&L</th>
+                      <th className="text-left px-3 py-2.5 font-semibold">Opened</th>
+                      <th className="text-left px-5 py-2.5 font-semibold">Closed</th>
+                    </tr>
+                  </thead>
+                  <tbody className="font-mono">
+                    {closed.map((c) => (
+                      <tr key={c.ticker + c.closed_at} className="border-b border-zinc-100 hover:bg-zinc-50" data-testid={`closed-row-${c.ticker}`}>
+                        <td className="px-5 py-2.5 font-semibold">{c.ticker}</td>
+                        <td className="px-3 py-2.5 text-right tabular">{fmtNum(c.original_qty)}</td>
+                        <td className="px-3 py-2.5 text-right tabular">{fmtUSD(c.avg_entry_price)}</td>
+                        <td className={`px-3 py-2.5 text-right tabular font-semibold ${c.realized_pnl >= 0 ? "text-profit" : "text-loss"}`}>
+                          {fmtUSD(c.realized_pnl)}
+                        </td>
+                        <td className="px-3 py-2.5 text-zinc-500">{fmtDate(c.opened_at)}</td>
+                        <td className="px-5 py-2.5 text-zinc-500">{fmtDate(c.closed_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </>
       )}
     </div>

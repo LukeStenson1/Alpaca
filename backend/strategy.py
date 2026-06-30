@@ -209,18 +209,24 @@ def _evaluate_sells(db, svc, ticker, params, snapshot, pstate, pos, summary):
                 f"(step trigger +{step * 100:.1f}%)"
             )
             order = svc.submit_sell_qty(ticker, sell_qty)
+            realized = (price - entry) * sell_qty
+            pstate.realized_pnl = (pstate.realized_pnl or 0.0) + realized
             db.add(Trade(
                 ticker=ticker, side="sell", quantity=round(sell_qty, 6), price=price,
                 order_id=order["id"], trigger_reason=reason, params_snapshot=snapshot,
-                timestamp=utcnow(),
+                realized_pnl=round(realized, 2), timestamp=utcnow(),
             ))
             executed.append(idx)
             pstate.tranches_executed = executed
             available -= sell_qty
             db.commit()
-            summary["sells"].append({"ticker": ticker, "qty": round(sell_qty, 6), "reason": reason})
+            summary["sells"].append({
+                "ticker": ticker, "qty": round(sell_qty, 6),
+                "realized_pnl": round(realized, 2), "reason": reason,
+            })
 
     # close position state if all tranches done or no shares left
     if len(executed) >= len(steps) and steps:
         pstate.status = "closed"
+        pstate.closed_at = utcnow()
         db.commit()

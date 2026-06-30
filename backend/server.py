@@ -36,6 +36,27 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 
+def _migrate():
+    """Lightweight additive SQLite migration for new columns."""
+    add_cols = {
+        "position_states": [("realized_pnl", "FLOAT DEFAULT 0.0"), ("closed_at", "DATETIME")],
+        "trades": [("realized_pnl", "FLOAT")],
+    }
+    with engine.connect() as conn:
+        for table, cols in add_cols.items():
+            try:
+                existing = [r[1] for r in conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()]
+            except Exception:
+                continue
+            for name, ddl in cols:
+                if name not in existing:
+                    try:
+                        conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+                    except Exception:
+                        pass
+        conn.commit()
+
+
 # ---------------- Pydantic schemas ----------------
 class WatchlistCreate(BaseModel):
     ticker: str
@@ -75,6 +96,7 @@ class SafetyLimitsBody(BaseModel):
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+    _migrate()
     db = SessionLocal()
     try:
         state = db.query(SystemState).get(1)
@@ -228,6 +250,41 @@ def snapshots(limit: int = 200, db: Session = Depends(get_db)):
     ]
 
 
+@app.get("/api/positions/closed")
+def closed_positions(db: Session = Depends(get_db)):
+    rows = (
+        db.query(PositionState)
+        .filter(PositionState.status == "closed")
+        .order_by(desc(PositionState.closed_at))
+        .all()
+    )
+    return [
+        {
+            "ticker": p.ticker,
+            "original_qty": p.original_qty,
+            "avg_entry_price": p.avg_entry_price,
+            "realized_pnl": p.realized_pnl or 0.0,
+            "tranches_executed": p.tranches_executed,
+            "opened_at": p.opened_at.isoformat() if p.opened_at else None,
+            "closed_at": p.closed_at.isoformat() if p.closed_at else None,
+        }
+        for p in rows
+    ]
+
+
+@app.get("/api/pnl/summary")
+def pnl_summary(db: Session = Depends(get_db)):
+    states = db.query(PositionState).all()
+    realized_total = sum((s.realized_pnl or 0.0) for s in states)
+    closed = [s for s in states if s.status == "closed"]
+    open_with_realized = [s for s in states if s.status == "open" and (s.realized_pnl or 0) != 0]
+    return {
+        "realized_total": round(realized_total, 2),
+        "closed_count": len(closed),
+        "open_partial_count": len(open_with_realized),
+    }
+
+
 # ---------------- watchlist + parameters ----------------
 def params_dict(p: Parameters):
     return {
@@ -334,6 +391,7 @@ def list_trades(
             "timestamp": t.timestamp.isoformat() if t.timestamp else None,
             "order_id": t.order_id, "trigger_reason": t.trigger_reason,
             "params_snapshot": t.params_snapshot,
+            "realized_pnl": t.realized_pnl,
         }
         for t in rows
     ]

@@ -92,6 +92,7 @@ export default function TradeHistory() {
                   <th className="text-left px-3 py-2.5 font-semibold">Side</th>
                   <th className="text-right px-3 py-2.5 font-semibold">Qty</th>
                   <th className="text-right px-3 py-2.5 font-semibold">Price</th>
+                  <th className="text-right px-3 py-2.5 font-semibold">Realized P&L</th>
                   <th className="text-left px-3 py-2.5 font-semibold">Trigger</th>
                   <th className="text-right px-5 py-2.5 font-semibold">Params</th>
                 </tr>
@@ -106,6 +107,9 @@ export default function TradeHistory() {
                     </td>
                     <td className="px-3 py-2.5 text-right tabular">{fmtNum(t.quantity)}</td>
                     <td className="px-3 py-2.5 text-right tabular">{fmtUSD(t.price)}</td>
+                    <td className={`px-3 py-2.5 text-right tabular ${t.realized_pnl == null ? "text-zinc-300" : t.realized_pnl >= 0 ? "text-profit" : "text-loss"}`}>
+                      {t.realized_pnl == null ? "—" : fmtUSD(t.realized_pnl)}
+                    </td>
                     <td className="px-3 py-2.5 text-zinc-600 font-sans text-xs max-w-md">{t.trigger_reason}</td>
                     <td className="px-5 py-2.5 text-right">
                       <button

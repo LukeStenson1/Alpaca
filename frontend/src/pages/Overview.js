@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
-import { Play, RefreshCw, WifiOff } from "lucide-react";
+import { Play, RefreshCw, WifiOff, AlertTriangle, PieChart } from "lucide-react";
 import client, { fmtUSD, fmtPct, fmtNum, fmtDate } from "../api";
 import { Card, CardHeader, Button, Stat, Spinner, EmptyState, Badge } from "../components/ui";
 import { useToast } from "../components/Toast";
@@ -16,23 +16,32 @@ export default function Overview() {
   const [snaps, setSnaps] = useState([]);
   const [pnl, setPnl] = useState(null);
   const [closed, setClosed] = useState([]);
+  const [flags, setFlags] = useState([]);
+  const [sectors, setSectors] = useState([]);
+  const [bench, setBench] = useState(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [a, p, s, summary, c] = await Promise.all([
+      const [a, p, s, summary, c, fl, sec, bm] = await Promise.all([
         client.get("/account"),
         client.get("/positions"),
         client.get("/account/snapshots", { params: { limit: 200 } }),
         client.get("/pnl/summary"),
         client.get("/positions/closed"),
+        client.get("/portfolio/flags"),
+        client.get("/portfolio/sectors"),
+        client.get("/portfolio/benchmark"),
       ]);
       setAccount(a.data);
       setPositions(p.data.positions || []);
       setSnaps(s.data || []);
       setPnl(summary.data);
       setClosed(c.data || []);
+      setFlags(fl.data.flags || []);
+      setSectors(sec.data.sectors || []);
+      setBench(bm.data || null);
     } catch (e) {
       toast("Failed to load overview", "error");
     } finally {
@@ -135,28 +144,40 @@ export default function Overview() {
             </div>
           </Card>
 
+          {flags.length > 0 && (
+            <Card data-testid="review-flags-card" className="border-warn/40">
+              <CardHeader title="Review Flags" subtitle="Informational — no automatic action taken" />
+              <div className="divide-y divide-zinc-100">
+                {flags.map((f, i) => (
+                  <div key={i} className="flex items-center gap-3 px-5 py-3 text-sm" data-testid={`flag-${f.type}-${f.ticker}`}>
+                    <AlertTriangle size={16} className="text-warn shrink-0" />
+                    <Badge tone="warn">{f.type}</Badge>
+                    <span className="text-zinc-700">{f.message}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2">
-              <CardHeader title="Equity Curve" subtitle="Recorded on each strategy run" />
+            <Card className="lg:col-span-2" data-testid="benchmark-card">
+              <CardHeader title="Portfolio vs Benchmark" subtitle={`Indexed to 100 · benchmark ${bench?.benchmark_ticker || "SPY"}`} />
               <div className="p-4 h-64">
-                {chartData.length < 2 ? (
-                  <EmptyState title="No equity history yet" hint="Run the strategy to start recording snapshots." />
+                {!bench || (bench.series || []).length < 2 ? (
+                  <EmptyState title="Not enough history yet" hint="Run the strategy across sessions to build the comparison." />
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                    <LineChart data={bench.series} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                       <CartesianGrid stroke="#f1f1f3" vertical={false} />
-                      <XAxis dataKey="t" tick={{ fontSize: 11, fontFamily: "JetBrains Mono" }} stroke="#a1a1aa" />
-                      <YAxis
-                        tick={{ fontSize: 11, fontFamily: "JetBrains Mono" }}
-                        stroke="#a1a1aa"
-                        domain={["auto", "auto"]}
-                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                      />
+                      <XAxis dataKey="timestamp" tick={false} stroke="#a1a1aa" />
+                      <YAxis tick={{ fontSize: 11, fontFamily: "JetBrains Mono" }} stroke="#a1a1aa" domain={["auto", "auto"]} />
                       <Tooltip
                         contentStyle={{ fontSize: 12, fontFamily: "JetBrains Mono", borderRadius: 6, border: "1px solid #e4e4e7" }}
-                        formatter={(v) => fmtUSD(v)}
+                        labelFormatter={(v) => new Date(v).toLocaleString()}
                       />
-                      <Line type="monotone" dataKey="equity" stroke="#002FA7" strokeWidth={2} dot={false} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Line type="monotone" dataKey="portfolio" name="Portfolio" stroke="#002FA7" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="benchmark" name={bench.benchmark_ticker} stroke="#71717A" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 )}
@@ -189,6 +210,27 @@ export default function Overview() {
               </div>
             </Card>
           </div>
+
+          {sectors.length > 0 && (
+            <Card data-testid="sector-breakdown-card">
+              <CardHeader title="Sector Exposure" subtitle="Current open positions by sector (manual tags)" />
+              <div className="divide-y divide-zinc-100">
+                {sectors.map((s) => (
+                  <div key={s.sector} className="px-5 py-3" data-testid={`sector-${s.sector}`}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2 text-zinc-700">
+                        <PieChart size={14} className="text-klein" /> {s.sector}
+                      </span>
+                      <span className="font-mono tabular text-zinc-600">{fmtUSD(s.value)} · {s.pct}%</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-klein" style={{ width: `${Math.min(s.pct, 100)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           <Card data-testid="closed-positions-card">
             <CardHeader title="Closed Positions — Realized P&L" subtitle={`${closed.length} fully closed`} />

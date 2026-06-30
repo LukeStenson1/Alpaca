@@ -10,6 +10,11 @@ export default function Settings() {
   const { state, refresh } = useSystem();
   const [maxLoss, setMaxLoss] = useState("");
   const [maxExp, setMaxExp] = useState("");
+  const [freq, setFreq] = useState("daily");
+  const [baseVol, setBaseVol] = useState("");
+  const [benchmark, setBenchmark] = useState("");
+  const [rebal, setRebal] = useState("");
+  const [savingLT, setSavingLT] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [showLiveConfirm, setShowLiveConfirm] = useState(false);
   const [savingLimits, setSavingLimits] = useState(false);
@@ -18,6 +23,10 @@ export default function Settings() {
     if (state) {
       setMaxLoss(state.max_daily_loss_usd);
       setMaxExp(state.max_total_exposure_usd);
+      setFreq(state.schedule_frequency || "daily");
+      setBaseVol(state.baseline_volatility);
+      setBenchmark(state.benchmark_ticker || "SPY");
+      setRebal(state.rebalance_threshold_pct);
     }
   }, [state]);
 
@@ -73,6 +82,24 @@ export default function Settings() {
       await refresh();
     } catch (e) {
       toast("Failed to update scheduler", "error");
+    }
+  };
+
+  const saveLongTerm = async () => {
+    setSavingLT(true);
+    try {
+      await client.put("/system/safety-limits", {
+        schedule_frequency: freq,
+        baseline_volatility: parseFloat(baseVol),
+        benchmark_ticker: benchmark.toUpperCase(),
+        rebalance_threshold_pct: parseFloat(rebal),
+      });
+      await refresh();
+      toast("Long-term strategy settings saved", "success");
+    } catch (e) {
+      toast(e.response?.data?.detail || "Failed to save", "error");
+    } finally {
+      setSavingLT(false);
     }
   };
 
@@ -170,9 +197,54 @@ export default function Settings() {
         </div>
       </Card>
 
+      {/* Long-term strategy settings */}
+      <Card data-testid="longterm-settings-card">
+        <CardHeader title="Strategy Cadence & Long-Term Settings" subtitle="Daily cadence runs before US open using prior-day closes" />
+        <div className="px-5 py-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Schedule frequency</label>
+              <div className="flex gap-2 mt-1">
+                {["daily", "weekly"].map((f) => (
+                  <button
+                    key={f}
+                    data-testid={`freq-${f}`}
+                    onClick={() => setFreq(f)}
+                    className={`flex-1 border rounded-md py-2 text-sm capitalize transition-colors ${
+                      freq === f ? "border-klein bg-blue-50/50 ring-1 ring-klein font-medium" : "border-zinc-200 hover:bg-zinc-50"
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Benchmark ticker</label>
+              <Input value={benchmark} data-testid="benchmark-input" onChange={(e) => setBenchmark(e.target.value.toUpperCase())} className="mt-1 font-mono uppercase" />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Baseline daily volatility (for vol-sizing)</label>
+              <Input type="number" step="0.005" value={baseVol} data-testid="baseline-vol-input" onChange={(e) => setBaseVol(e.target.value)} className="mt-1 font-mono" />
+              <p className="text-xs text-zinc-400 mt-1">e.g. 0.02 = 2% daily stddev baseline.</p>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Rebalance flag threshold (0–1)</label>
+              <Input type="number" step="0.05" value={rebal} data-testid="rebal-threshold-input" onChange={(e) => setRebal(e.target.value)} className="mt-1 font-mono" />
+              <p className="text-xs text-zinc-400 mt-1">Flag any position exceeding this share of the portfolio.</p>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={saveLongTerm} disabled={savingLT} data-testid="save-longterm-btn">
+              <Save size={15} /> {savingLT ? "Saving…" : "Save Strategy Settings"}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
       {/* Scheduler */}
       <Card>
-        <CardHeader title="Automated Scheduler" subtitle="Runs the strategy every 20 minutes" />
+        <CardHeader title="Automated Scheduler" subtitle="Runs the strategy on the configured cadence (before US open)" />
         <div className="px-5 py-5 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-zinc-600">
             <Clock size={16} />

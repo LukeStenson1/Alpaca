@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, ListChecks, History, Lightbulb, Settings as SettingsIcon,
-  Power, Bell, Activity, ShieldAlert,
+  Power, Bell, Activity, ShieldAlert, BarChart3,
 } from "lucide-react";
 import client from "../api";
 import { useSystem } from "./SystemContext";
@@ -14,6 +14,7 @@ const nav = [
   { to: "/watchlist", label: "Watchlist", icon: ListChecks, testid: "nav-watchlist" },
   { to: "/trades", label: "Trade History", icon: History, testid: "nav-trades" },
   { to: "/suggestions", label: "Suggestions", icon: Lightbulb, testid: "nav-suggestions" },
+  { to: "/reports", label: "P&L Reports", icon: BarChart3, testid: "nav-reports" },
   { to: "/settings", label: "Settings", icon: SettingsIcon, testid: "nav-settings" },
 ];
 

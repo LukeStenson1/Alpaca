@@ -15,16 +15,25 @@ class Watchlist(Base):
     date_added = Column(DateTime, default=utcnow)
     active = Column(Boolean, default=True)
     notes = Column(Text, nullable=True)
+    sector = Column(String, nullable=True)
 
 
 class Parameters(Base):
     __tablename__ = "parameters"
     ticker = Column(String, ForeignKey("watchlist.ticker"), primary_key=True)
     buy_threshold_stddev = Column(Float, default=2.0)
-    lookback_days = Column(Integer, default=30)
+    lookback_days = Column(Integer, default=150)
     sell_tranche_pct = Column(Float, default=0.25)
     sell_gain_steps = Column(JSON, default=lambda: [0.05, 0.10, 0.20, 0.30])
     max_position_size_usd = Column(Float, default=1000.0)
+    # --- v2 risk / valuation additions ---
+    stop_loss_pct = Column(Float, default=0.0)          # 0 disables stop-loss
+    max_hold_days = Column(Integer, nullable=True)       # None disables staleness flag
+    use_volatility_sizing = Column(Boolean, default=False)
+    use_52w_range = Column(Boolean, default=False)
+    range_pct = Column(Float, default=0.15)              # buy only in bottom X of 52w range
+    allow_downtrend_buys = Column(Boolean, default=False)  # override 200d MA trend filter
+    cooldown_days = Column(Integer, default=7)           # re-entry cooldown after a close
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 
@@ -52,6 +61,7 @@ class PositionState(Base):
     opened_at = Column(DateTime, default=utcnow)
     closed_at = Column(DateTime, nullable=True)
     realized_pnl = Column(Float, default=0.0)
+    entry_order_id = Column(String, nullable=True)  # limit buy order id, for fill reconciliation
     status = Column(String, default="open")  # open / closed
 
 
@@ -98,4 +108,10 @@ class SystemState(Base):
     day_start_equity = Column(Float, nullable=True)
     day_start_date = Column(String, nullable=True)  # YYYY-MM-DD
     scheduler_enabled = Column(Boolean, default=True)
+    # --- v2 long-term additions ---
+    schedule_frequency = Column(String, default="daily")   # daily / weekly
+    schedule_timing = Column(String, default="before_open")  # before_open / after_close
+    baseline_volatility = Column(Float, default=0.02)      # for volatility-adjusted sizing
+    benchmark_ticker = Column(String, default="SPY")
+    rebalance_threshold_pct = Column(Float, default=0.20)  # flag if a position exceeds this share
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)

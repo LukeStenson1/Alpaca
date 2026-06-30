@@ -4,7 +4,7 @@ import client, { fmtUSD, fmtDate } from "../api";
 import { Card, CardHeader, Button, Input, Badge, Toggle, Spinner, EmptyState } from "../components/ui";
 import { useToast } from "../components/Toast";
 
-function ParamEditor({ ticker, params, onSaved }) {
+function ParamEditor({ ticker, params, sector, onSaved }) {
   const toast = useToast();
   const [form, setForm] = useState({
     buy_threshold_stddev: params.buy_threshold_stddev,
@@ -12,25 +12,37 @@ function ParamEditor({ ticker, params, onSaved }) {
     sell_tranche_pct: params.sell_tranche_pct,
     sell_gain_steps: (params.sell_gain_steps || []).join(", "),
     max_position_size_usd: params.max_position_size_usd,
+    stop_loss_pct: params.stop_loss_pct ?? 0,
+    max_hold_days: params.max_hold_days ?? "",
+    cooldown_days: params.cooldown_days ?? 7,
+    range_pct: params.range_pct ?? 0.15,
+    use_volatility_sizing: !!params.use_volatility_sizing,
+    use_52w_range: !!params.use_52w_range,
+    allow_downtrend_buys: !!params.allow_downtrend_buys,
+    sector: sector || "",
   });
   const [saving, setSaving] = useState(false);
-
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const save = async () => {
     setSaving(true);
     try {
-      const steps = form.sell_gain_steps
-        .split(",")
-        .map((s) => parseFloat(s.trim()))
-        .filter((n) => !isNaN(n));
+      const steps = form.sell_gain_steps.split(",").map((s) => parseFloat(s.trim())).filter((n) => !isNaN(n));
       await client.put(`/parameters/${ticker}`, {
         buy_threshold_stddev: parseFloat(form.buy_threshold_stddev),
         lookback_days: parseInt(form.lookback_days, 10),
         sell_tranche_pct: parseFloat(form.sell_tranche_pct),
         sell_gain_steps: steps,
         max_position_size_usd: parseFloat(form.max_position_size_usd),
+        stop_loss_pct: parseFloat(form.stop_loss_pct),
+        max_hold_days: form.max_hold_days === "" ? null : parseInt(form.max_hold_days, 10),
+        cooldown_days: parseInt(form.cooldown_days, 10),
+        range_pct: parseFloat(form.range_pct),
+        use_volatility_sizing: form.use_volatility_sizing,
+        use_52w_range: form.use_52w_range,
+        allow_downtrend_buys: form.allow_downtrend_buys,
       });
+      await client.put(`/watchlist/${ticker}`, { sector: form.sector });
       toast(`${ticker} parameters saved`, "success");
       onSaved();
     } catch (e) {
@@ -42,9 +54,19 @@ function ParamEditor({ ticker, params, onSaved }) {
 
   const fields = [
     { k: "buy_threshold_stddev", label: "Buy threshold (std devs below mean)", step: "0.1" },
-    { k: "lookback_days", label: "Lookback days", step: "1" },
+    { k: "lookback_days", label: "Lookback days (100–200 typical)", step: "1" },
     { k: "sell_tranche_pct", label: "Sell tranche % (0–1)", step: "0.05" },
     { k: "max_position_size_usd", label: "Max position size (USD)", step: "100" },
+    { k: "stop_loss_pct", label: "Stop-loss % below entry (0 = off)", step: "0.01" },
+    { k: "cooldown_days", label: "Re-entry cooldown (days)", step: "1" },
+    { k: "max_hold_days", label: "Max hold days (blank = no flag)", step: "1" },
+    { k: "range_pct", label: "52w-range gate: bottom X (0–1)", step: "0.05" },
+  ];
+
+  const toggles = [
+    { k: "use_52w_range", label: "Use 52-week range gate" },
+    { k: "use_volatility_sizing", label: "Volatility-adjusted sizing" },
+    { k: "allow_downtrend_buys", label: "Allow buys in downtrend (below 200d MA)", danger: true },
   ];
 
   return (
@@ -74,7 +96,32 @@ function ParamEditor({ ticker, params, onSaved }) {
             className="mt-1 font-mono"
           />
         </div>
+        <div>
+          <label className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Sector (manual tag)</label>
+          <Input
+            value={form.sector}
+            data-testid={`param-sector-${ticker}`}
+            onChange={(e) => set("sector", e.target.value)}
+            placeholder="e.g. Technology"
+            className="mt-1"
+          />
+        </div>
       </div>
+
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        {toggles.map((t) => (
+          <div key={t.k} className="flex items-center justify-between border border-zinc-200 bg-white rounded-md px-3 py-2">
+            <span className="text-xs text-zinc-600 pr-2">{t.label}</span>
+            <Toggle
+              checked={form[t.k]}
+              danger={t.danger}
+              onChange={(v) => set(t.k, v)}
+              testid={`param-${t.k}-${ticker}`}
+            />
+          </div>
+        ))}
+      </div>
+
       <div className="mt-4 flex justify-end">
         <Button onClick={save} disabled={saving} data-testid={`save-params-${ticker}`}>
           <Save size={15} /> {saving ? "Saving…" : "Save Parameters"}
@@ -226,6 +273,7 @@ export default function Watchlist() {
                     <ParamEditor
                       ticker={item.ticker}
                       params={p}
+                      sector={item.sector}
                       onSaved={() => {
                         setExpanded(null);
                         load();

@@ -39,8 +39,23 @@ def utcnow():
 def _migrate():
     """Lightweight additive SQLite migration for new columns."""
     add_cols = {
-        "position_states": [("realized_pnl", "FLOAT DEFAULT 0.0"), ("closed_at", "DATETIME")],
+        "position_states": [("realized_pnl", "FLOAT DEFAULT 0.0"), ("closed_at", "DATETIME"),
+                            ("entry_order_id", "VARCHAR")],
         "trades": [("realized_pnl", "FLOAT")],
+        "parameters": [
+            ("stop_loss_pct", "FLOAT DEFAULT 0.0"), ("max_hold_days", "INTEGER"),
+            ("use_volatility_sizing", "BOOLEAN DEFAULT 0"), ("use_52w_range", "BOOLEAN DEFAULT 0"),
+            ("range_pct", "FLOAT DEFAULT 0.15"), ("allow_downtrend_buys", "BOOLEAN DEFAULT 0"),
+            ("cooldown_days", "INTEGER DEFAULT 7"),
+        ],
+        "watchlist": [("sector", "VARCHAR")],
+        "system_state": [
+            ("schedule_frequency", "VARCHAR DEFAULT 'daily'"),
+            ("schedule_timing", "VARCHAR DEFAULT 'before_open'"),
+            ("baseline_volatility", "FLOAT DEFAULT 0.02"),
+            ("benchmark_ticker", "VARCHAR DEFAULT 'SPY'"),
+            ("rebalance_threshold_pct", "FLOAT DEFAULT 0.20"),
+        ],
     }
     with engine.connect() as conn:
         for table, cols in add_cols.items():
@@ -66,6 +81,7 @@ class WatchlistCreate(BaseModel):
 class WatchlistUpdate(BaseModel):
     active: Optional[bool] = None
     notes: Optional[str] = None
+    sector: Optional[str] = None
 
 
 class ParametersUpdate(BaseModel):
@@ -74,6 +90,13 @@ class ParametersUpdate(BaseModel):
     sell_tranche_pct: Optional[float] = None
     sell_gain_steps: Optional[List[float]] = None
     max_position_size_usd: Optional[float] = None
+    stop_loss_pct: Optional[float] = None
+    max_hold_days: Optional[int] = None
+    use_volatility_sizing: Optional[bool] = None
+    use_52w_range: Optional[bool] = None
+    range_pct: Optional[float] = None
+    allow_downtrend_buys: Optional[bool] = None
+    cooldown_days: Optional[int] = None
 
 
 class KillSwitchBody(BaseModel):
@@ -90,6 +113,10 @@ class SafetyLimitsBody(BaseModel):
     max_daily_loss_usd: Optional[float] = None
     max_total_exposure_usd: Optional[float] = None
     scheduler_enabled: Optional[bool] = None
+    schedule_frequency: Optional[str] = None
+    baseline_volatility: Optional[float] = None
+    benchmark_ticker: Optional[str] = None
+    rebalance_threshold_pct: Optional[float] = None
 
 
 # ---------------- startup ----------------
@@ -134,6 +161,11 @@ def state_dict(s: SystemState):
         "max_total_exposure_usd": s.max_total_exposure_usd,
         "day_start_equity": s.day_start_equity,
         "scheduler_enabled": s.scheduler_enabled,
+        "schedule_frequency": s.schedule_frequency,
+        "schedule_timing": s.schedule_timing,
+        "baseline_volatility": s.baseline_volatility,
+        "benchmark_ticker": s.benchmark_ticker,
+        "rebalance_threshold_pct": s.rebalance_threshold_pct,
         "updated_at": s.updated_at.isoformat() if s.updated_at else None,
     }
 
@@ -190,6 +222,18 @@ def set_safety(body: SafetyLimitsBody, db: Session = Depends(get_db)):
         s.max_total_exposure_usd = body.max_total_exposure_usd
     if body.scheduler_enabled is not None:
         s.scheduler_enabled = body.scheduler_enabled
+    if body.schedule_frequency is not None:
+        freq = body.schedule_frequency.lower()
+        if freq not in ("daily", "weekly"):
+            raise HTTPException(400, "schedule_frequency must be 'daily' or 'weekly'")
+        s.schedule_frequency = freq
+        scheduler.reschedule_strategy(freq)
+    if body.baseline_volatility is not None:
+        s.baseline_volatility = body.baseline_volatility
+    if body.benchmark_ticker is not None:
+        s.benchmark_ticker = body.benchmark_ticker.strip().upper()
+    if body.rebalance_threshold_pct is not None:
+        s.rebalance_threshold_pct = body.rebalance_threshold_pct
     db.commit()
     return state_dict(get_state(db))
 
@@ -285,6 +329,136 @@ def pnl_summary(db: Session = Depends(get_db)):
     }
 
 
+# ---------------- portfolio-level features ----------------
+@app.get("/api/portfolio/flags")
+def portfolio_flags(db: Session = Depends(get_db)):
+    """Informational review flags: staleness (max_hold_days) + concentration/rebalance."""
+    s = get_state(db)
+    svc = get_service(s.trading_mode)
+    flags = []
+    try:
+        positions = [p for p in svc.get_positions() if p["market_value"] >= 1.0]
+    except Exception as e:
+        return {"flags": [], "error": str(e)}
+    total = sum(p["market_value"] for p in positions) or 0.0
+
+    # concentration / rebalance flags
+    for p in positions:
+        share = (p["market_value"] / total) if total else 0
+        if share >= s.rebalance_threshold_pct:
+            flags.append({
+                "type": "rebalance", "ticker": p["ticker"],
+                "message": f"{p['ticker']} is {share*100:.0f}% of portfolio "
+                           f"(threshold {s.rebalance_threshold_pct*100:.0f}%) — review for rebalance.",
+            })
+
+    # staleness flags
+    open_states = db.query(PositionState).filter(PositionState.status == "open").all()
+    pos_tickers = {p["ticker"] for p in positions}
+    for ps in open_states:
+        params = db.query(Parameters).get(ps.ticker)
+        if not params or not params.max_hold_days or ps.ticker not in pos_tickers:
+            continue
+        if ps.opened_at:
+            opened = ps.opened_at if ps.opened_at.tzinfo else ps.opened_at.replace(tzinfo=timezone.utc)
+            held = (utcnow() - opened).days
+            if held > params.max_hold_days:
+                flags.append({
+                    "type": "staleness", "ticker": ps.ticker,
+                    "message": f"Review: {ps.ticker} held {held} days "
+                               f"(> {params.max_hold_days}d) with no exit triggered.",
+                })
+    return {"flags": flags, "total_value": round(total, 2)}
+
+
+@app.get("/api/portfolio/sectors")
+def portfolio_sectors(db: Session = Depends(get_db)):
+    s = get_state(db)
+    svc = get_service(s.trading_mode)
+    try:
+        positions = [p for p in svc.get_positions() if p["market_value"] >= 1.0]
+    except Exception as e:
+        return {"sectors": [], "error": str(e)}
+    sector_map = {w.ticker: (w.sector or "Unclassified") for w in db.query(Watchlist).all()}
+    agg = {}
+    total = 0.0
+    for p in positions:
+        sec = sector_map.get(p["ticker"], "Unclassified")
+        agg[sec] = agg.get(sec, 0.0) + p["market_value"]
+        total += p["market_value"]
+    out = [{"sector": k, "value": round(v, 2), "pct": round((v / total * 100) if total else 0, 1)}
+           for k, v in sorted(agg.items(), key=lambda kv: -kv[1])]
+    return {"sectors": out, "total_value": round(total, 2)}
+
+
+@app.get("/api/portfolio/benchmark")
+def portfolio_benchmark(db: Session = Depends(get_db)):
+    """Portfolio equity vs benchmark, both indexed to 100 at the first snapshot."""
+    s = get_state(db)
+    svc = get_service(s.trading_mode)
+    snaps = db.query(AccountSnapshot).order_by(AccountSnapshot.timestamp.asc()).all()
+    if len(snaps) < 2:
+        return {"benchmark_ticker": s.benchmark_ticker, "series": [], "note": "need more history"}
+    base_eq = snaps[0].equity or 1
+    # benchmark daily closes aligned by date
+    bench_by_date = {}
+    try:
+        bars = svc.get_daily_bars(s.benchmark_ticker, 260)
+        # map not date-aware (bars lack date here); fall back to indexing by order
+        bench_closes = [b["close"] for b in bars]
+    except Exception:
+        bench_closes = []
+    series = []
+    for i, snap in enumerate(snaps):
+        point = {
+            "timestamp": snap.timestamp.isoformat(),
+            "portfolio": round((snap.equity / base_eq) * 100, 2),
+        }
+        series.append(point)
+    # overlay benchmark indexed to 100 across the same number of points (tail-aligned)
+    if bench_closes:
+        n = len(series)
+        tail = bench_closes[-n:] if len(bench_closes) >= n else bench_closes
+        if tail:
+            b0 = tail[0]
+            for i, point in enumerate(series):
+                if i < len(tail):
+                    point["benchmark"] = round((tail[i] / b0) * 100, 2)
+    return {"benchmark_ticker": s.benchmark_ticker, "series": series}
+
+
+# ---------------- reporting: monthly/quarterly P&L rollup ----------------
+@app.get("/api/reports/pnl")
+def reports_pnl(period: str = "month", db: Session = Depends(get_db)):
+    s = get_state(db)
+    svc = get_service(s.trading_mode)
+    sells = db.query(Trade).filter(Trade.side == "sell").all()
+    buckets = {}
+    for t in sells:
+        if not t.timestamp:
+            continue
+        if period == "quarter":
+            q = (t.timestamp.month - 1) // 3 + 1
+            key = f"{t.timestamp.year}-Q{q}"
+        else:
+            key = t.timestamp.strftime("%Y-%m")
+        b = buckets.setdefault(key, {"period": key, "realized_pnl": 0.0, "trade_count": 0})
+        b["realized_pnl"] += (t.realized_pnl or 0.0)
+        b["trade_count"] += 1
+    rows = sorted(buckets.values(), key=lambda r: r["period"], reverse=True)
+    for r in rows:
+        r["realized_pnl"] = round(r["realized_pnl"], 2)
+    # current unrealized (point-in-time)
+    unrealized = 0.0
+    try:
+        unrealized = round(sum(p["unrealized_pl"] for p in svc.get_positions()), 2)
+    except Exception:
+        pass
+    return {"period": period, "rows": rows,
+            "realized_total": round(sum(r["realized_pnl"] for r in rows), 2),
+            "current_unrealized": unrealized}
+
+
 # ---------------- watchlist + parameters ----------------
 def params_dict(p: Parameters):
     return {
@@ -294,6 +468,13 @@ def params_dict(p: Parameters):
         "sell_tranche_pct": p.sell_tranche_pct,
         "sell_gain_steps": p.sell_gain_steps,
         "max_position_size_usd": p.max_position_size_usd,
+        "stop_loss_pct": p.stop_loss_pct,
+        "max_hold_days": p.max_hold_days,
+        "use_volatility_sizing": p.use_volatility_sizing,
+        "use_52w_range": p.use_52w_range,
+        "range_pct": p.range_pct,
+        "allow_downtrend_buys": p.allow_downtrend_buys,
+        "cooldown_days": p.cooldown_days,
         "updated_at": p.updated_at.isoformat() if p.updated_at else None,
     }
 
@@ -308,6 +489,7 @@ def list_watchlist(db: Session = Depends(get_db)):
             "date_added": w.date_added.isoformat() if w.date_added else None,
             "active": w.active,
             "notes": w.notes,
+            "sector": w.sector,
             "parameters": params_dict(p) if p else None,
         })
     return out
@@ -335,8 +517,10 @@ def update_watchlist(ticker: str, body: WatchlistUpdate, db: Session = Depends(g
         w.active = body.active
     if body.notes is not None:
         w.notes = body.notes
+    if body.sector is not None:
+        w.sector = body.sector.strip() or None
     db.commit()
-    return {"ticker": w.ticker, "active": w.active, "notes": w.notes}
+    return {"ticker": w.ticker, "active": w.active, "notes": w.notes, "sector": w.sector}
 
 
 @app.delete("/api/watchlist/{ticker}")

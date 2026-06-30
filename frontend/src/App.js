@@ -7,6 +7,7 @@ import Overview from "./pages/Overview";
 import Watchlist from "./pages/Watchlist";
 import TradeHistory from "./pages/TradeHistory";
 import Suggestions from "./pages/Suggestions";
+import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
               <Route path="/watchlist" element={<Watchlist />} />
               <Route path="/trades" element={<TradeHistory />} />
               <Route path="/suggestions" element={<Suggestions />} />
+              <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </Layout>

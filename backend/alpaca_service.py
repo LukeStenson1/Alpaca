@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
-from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest, GetOrdersRequest
+from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrame
@@ -83,6 +83,20 @@ class AlpacaService:
         res = self.data.get_stock_latest_trade(req)
         return float(res[ticker].price)
 
+    def get_daily_bars(self, ticker, days):
+        """Return up to `days` most recent daily bars as dicts with close/high/low."""
+        start = datetime.now(timezone.utc) - timedelta(days=int(days * 1.6) + 15)
+        req = StockBarsRequest(
+            symbol_or_symbols=ticker,
+            timeframe=TimeFrame.Day,
+            start=start,
+            feed=DataFeed.IEX,
+        )
+        bars = self.data.get_stock_bars(req)
+        data = bars.data.get(ticker, [])
+        rows = [{"close": float(b.close), "high": float(b.high), "low": float(b.low)} for b in data]
+        return rows[-days:] if len(rows) > days else rows
+
     # ---------- orders ----------
     def submit_buy_notional(self, ticker, notional):
         req = MarketOrderRequest(
@@ -93,6 +107,30 @@ class AlpacaService:
         )
         o = self.trading.submit_order(req)
         return {"id": str(o.id), "status": str(o.status), "qty": float(o.qty or 0)}
+
+    def submit_buy_limit(self, ticker, qty, limit_price):
+        """Limit BUY. Alpaca requires integer qty for limit orders."""
+        req = LimitOrderRequest(
+            symbol=ticker,
+            qty=int(qty),
+            side=OrderSide.BUY,
+            time_in_force=TimeInForce.DAY,
+            limit_price=round(float(limit_price), 2),
+        )
+        o = self.trading.submit_order(req)
+        return {"id": str(o.id), "status": str(o.status), "qty": float(o.qty or 0)}
+
+    def get_open_orders(self, ticker=None):
+        kwargs = {"status": QueryOrderStatus.OPEN}
+        if ticker:
+            kwargs["symbols"] = [ticker]
+        return self.trading.get_orders(filter=GetOrdersRequest(**kwargs))
+
+    def cancel_all_orders(self):
+        try:
+            self.trading.cancel_orders()
+        except Exception:
+            pass
 
     def submit_sell_qty(self, ticker, qty):
         req = MarketOrderRequest(

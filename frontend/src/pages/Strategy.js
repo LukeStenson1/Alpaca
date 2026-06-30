@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Save, Sparkles, Info } from "lucide-react";
+import { Save, Sparkles } from "lucide-react";
 import client from "../api";
-import { Card, CardHeader, Button, Input, Toggle, Spinner } from "../components/ui";
+import { Card, CardHeader, Button, Input, Toggle, Spinner, SectionTitle } from "../components/ui";
 import { useToast } from "../components/Toast";
 
 const PRESETS = {
@@ -9,13 +9,18 @@ const PRESETS = {
   Balanced: { buy_threshold_stddev: 2.0, lookback_days: 150, sell_tranche_pct: 0.25, sell_gain_steps: "0.10, 0.20, 0.35, 0.50", stop_loss_pct: 0.20, cooldown_days: 14, max_hold_days: "", range_pct: 0.30, use_52w_range: true, use_volatility_sizing: true, allow_downtrend_buys: false, min_conviction_to_buy: 3, earnings_blackout_days: 5, investing_style: "blended" },
   Tactical: { buy_threshold_stddev: 1.5, lookback_days: 100, sell_tranche_pct: 0.5, sell_gain_steps: "0.10, 0.25", stop_loss_pct: 0.20, cooldown_days: 5, max_hold_days: "", range_pct: 0.4, use_52w_range: false, use_volatility_sizing: false, allow_downtrend_buys: true, min_conviction_to_buy: 2, earnings_blackout_days: 3, investing_style: "tactical" },
 };
+const PRESET_DESC = {
+  Conservative: "Deep dips only · long holds · tight risk",
+  Balanced: "Sensible defaults for most long-term investors",
+  Tactical: "Earlier entries · quicker profits · more active",
+};
 const pct = (v) => (isNaN(parseFloat(v)) ? "" : `${(parseFloat(v) * 100).toFixed(0)}%`);
 const stepsToPct = (s) => (s || "").split(",").map((x) => x.trim()).filter(Boolean).map((x) => (isNaN(parseFloat(x)) ? x : `+${(parseFloat(x) * 100).toFixed(0)}%`)).join(", ");
 
 function NumField({ label, desc, value, onChange, testid, step, helper }) {
   return (
     <div>
-      <label className="text-sm font-semibold text-zinc-800">{label}</label>
+      <label className="text-sm font-semibold text-zinc-100">{label}</label>
       <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{desc}</p>
       <div className="flex items-center gap-2 mt-1.5">
         <Input type="number" step={step} value={value} data-testid={testid} onChange={(e) => onChange(e.target.value)} className="font-mono" />
@@ -26,8 +31,8 @@ function NumField({ label, desc, value, onChange, testid, step, helper }) {
 }
 function ToggleField({ label, desc, checked, onChange, testid, danger }) {
   return (
-    <div className="flex items-start justify-between gap-3 border border-zinc-200 bg-white rounded-md px-3 py-2.5">
-      <div><div className="text-sm font-semibold text-zinc-800">{label}</div><p className="text-xs text-zinc-500 mt-0.5">{desc}</p></div>
+    <div className="flex items-start justify-between gap-3 border border-zinc-800 bg-zinc-950 rounded-lg px-3 py-2.5">
+      <div><div className="text-sm font-semibold text-zinc-100">{label}</div><p className="text-xs text-zinc-500 mt-0.5">{desc}</p></div>
       <div className="pt-0.5"><Toggle checked={checked} danger={danger} onChange={onChange} testid={testid} /></div>
     </div>
   );
@@ -35,13 +40,13 @@ function ToggleField({ label, desc, checked, onChange, testid, danger }) {
 function Section({ title, hint, children }) {
   return (
     <div>
-      <div className="flex items-baseline gap-2 mb-3"><h4 className="text-[11px] font-bold uppercase tracking-wider text-zinc-950">{title}</h4>{hint && <span className="text-xs text-zinc-400">{hint}</span>}</div>
+      <SectionTitle title={title} hint={hint} />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>
     </div>
   );
 }
 
-export default function Strategy() {
+export default function Strategy({ embedded = false }) {
   const toast = useToast();
   const [f, setF] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -71,30 +76,40 @@ export default function Strategy() {
         use_volatility_sizing: f.use_volatility_sizing, investing_style: f.investing_style,
         min_conviction_to_buy: parseInt(f.min_conviction_to_buy, 10), earnings_blackout_days: parseInt(f.earnings_blackout_days, 10),
       });
-      toast("Strategy settings saved — applies to all stocks", "success");
+      toast("Strategy rules saved — applies to all stocks", "success");
     } catch (e) { toast("Failed to save", "error"); } finally { setSaving(false); }
   };
 
   return (
-    <div className="space-y-6 max-w-4xl" data-testid="strategy-page">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Strategy</h1>
-        <p className="text-sm text-zinc-500">One set of rules applied to every stock in your watchlist. Per-stock conviction lives on the Watchlist.</p>
-      </div>
+    <div className="space-y-5" data-testid="strategy-page">
+      {!embedded && (
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Strategy</h1>
+          <p className="text-sm text-zinc-500">One set of rules applied to every stock in your watchlist.</p>
+        </div>
+      )}
 
-      <Card><div className="flex flex-wrap items-center gap-2 px-5 py-3.5">
-        <span className="text-xs text-zinc-600 flex items-center gap-1.5 mr-1"><Sparkles size={14} className="text-klein" /> Quick start:</span>
-        {Object.keys(PRESETS).map((n) => (
-          <Button key={n} variant="outline" onClick={() => applyPreset(n)} data-testid={`preset-${n.toLowerCase()}`} className="py-1.5">{n}</Button>
-        ))}
-      </div></Card>
+      <Card>
+        <CardHeader title="Quick start presets" subtitle="Pick a starting point, then fine-tune below — no need to touch every field" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4">
+          {Object.keys(PRESETS).map((n) => (
+            <button key={n} onClick={() => applyPreset(n)} data-testid={`preset-${n.toLowerCase()}`}
+              className="text-left border border-zinc-800 hover:border-klein/60 bg-zinc-950 rounded-lg p-4 transition-colors group">
+              <div className="flex items-center gap-2 text-zinc-100 font-semibold text-sm">
+                <Sparkles size={14} className="text-klein" /> {n}
+              </div>
+              <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed">{PRESET_DESC[n]}</p>
+            </button>
+          ))}
+        </div>
+      </Card>
 
       <Card><CardHeader title="Approach" subtitle="How aggressive and how long-term" /><div className="px-5 py-5">
         <Section title="Investing style">
           <div className="md:col-span-2 flex gap-2">
             {["longterm", "blended", "tactical"].map((s) => (
               <button key={s} onClick={() => set("investing_style", s)} data-testid={`style-${s}`}
-                className={`flex-1 border rounded-md py-2.5 text-sm capitalize transition-colors ${f.investing_style === s ? "border-klein bg-blue-50/50 ring-1 ring-klein font-medium" : "border-zinc-200 hover:bg-zinc-50"}`}>
+                className={`flex-1 border rounded-lg py-2.5 text-sm capitalize transition-colors ${f.investing_style === s ? "border-klein bg-klein/15 text-zinc-50 font-medium" : "border-zinc-800 text-zinc-300 hover:bg-zinc-800"}`}>
                 {s === "longterm" ? "Long-term" : s}
               </button>
             ))}
@@ -132,8 +147,8 @@ export default function Strategy() {
         <ToggleField label="Smaller bets on jumpier stocks" testid="vol-sizing" checked={f.use_volatility_sizing} onChange={(v) => set("use_volatility_sizing", v)} desc="Invest less in more volatile names." />
       </Section></div></Card>
 
-      <div className="flex justify-end pb-4">
-        <Button onClick={save} disabled={saving} data-testid="save-strategy-btn"><Save size={15} /> {saving ? "Saving…" : "Save Strategy (all stocks)"}</Button>
+      <div className="flex justify-end">
+        <Button onClick={save} disabled={saving} data-testid="save-strategy-btn"><Save size={15} /> {saving ? "Saving…" : "Save Strategy Rules"}</Button>
       </div>
     </div>
   );

@@ -5,10 +5,8 @@ import { SystemProvider } from "./components/SystemContext";
 import Layout from "./components/Layout";
 import Overview from "./pages/Overview";
 import Research from "./pages/Research";
-import TradeHistory from "./pages/TradeHistory";
-import Reports from "./pages/Reports";
-import Strategy from "./pages/Strategy";
 import Settings from "./pages/Settings";
+import History from "./pages/History";
 
 export default function App() {
   return (
@@ -19,13 +17,15 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Overview />} />
               <Route path="/research" element={<Research />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/history" element={<History />} />
+              {/* legacy redirects */}
               <Route path="/watchlist" element={<Research initialTab="watchlist" />} />
               <Route path="/influencers" element={<Research initialTab="influencers" />} />
-              <Route path="/suggestions" element={<Research initialTab="suggestions" />} />
-              <Route path="/trades" element={<TradeHistory />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/strategy" element={<Strategy />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/strategy" element={<Settings />} />
+              <Route path="/suggestions" element={<Settings />} />
+              <Route path="/trades" element={<History initialTab="trades" />} />
+              <Route path="/reports" element={<History initialTab="reports" />} />
             </Routes>
           </Layout>
         </BrowserRouter>

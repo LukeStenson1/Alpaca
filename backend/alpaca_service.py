@@ -1,4 +1,6 @@
 import os
+import time
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from dotenv import load_dotenv
@@ -30,10 +32,29 @@ class AlpacaService:
             self.key, self.secret = PAPER_KEY, PAPER_SECRET
         self.trading = TradingClient(self.key, self.secret, paper=(mode != "live"))
         self.data = StockHistoricalDataClient(self.key, self.secret)
+        self._lock = threading.RLock()
+        self._cache = {}
+
+    def _cached(self, key, ttl, fn):
+        """Serialized, TTL-cached Alpaca read. Collapses concurrent/repeat calls
+        into a single upstream request and prevents shared-session races."""
+        with self._lock:
+            now = time.time()
+            hit = self._cache.get(key)
+            if hit and now - hit[0] < ttl:
+                return hit[1]
+            val = fn()
+            self._cache[key] = (now, val)
+            return val
+
+    def _invalidate(self):
+        with self._lock:
+            self._cache.pop("account", None)
+            self._cache.pop("positions", None)
 
     # ---------- account / positions ----------
     def get_account(self):
-        a = self.trading.get_account()
+        a = self._cached("account", 8, lambda: self.trading.get_account())
         return {
             "equity": float(a.equity),
             "last_equity": float(a.last_equity),
@@ -45,7 +66,8 @@ class AlpacaService:
 
     def get_positions(self):
         out = []
-        for p in self.trading.get_all_positions():
+        positions = self._cached("positions", 8, lambda: self.trading.get_all_positions())
+        for p in positions:
             out.append({
                 "ticker": p.symbol,
                 "qty": float(p.qty),
@@ -73,28 +95,32 @@ class AlpacaService:
             start=start,
             feed=DataFeed.IEX,
         )
-        bars = self.data.get_stock_bars(req)
+        with self._lock:
+            bars = self.data.get_stock_bars(req)
         data = bars.data.get(ticker, [])
         closes = [float(b.close) for b in data]
         return closes[-lookback_days:] if len(closes) > lookback_days else closes
 
     def get_latest_price(self, ticker):
         req = StockLatestTradeRequest(symbol_or_symbols=ticker, feed=DataFeed.IEX)
-        res = self.data.get_stock_latest_trade(req)
+        with self._lock:
+            res = self.data.get_stock_latest_trade(req)
         return float(res[ticker].price)
 
     def get_daily_bars(self, ticker, days):
         """Return up to `days` most recent daily bars as dicts with close/high/low."""
-        start = datetime.now(timezone.utc) - timedelta(days=int(days * 1.6) + 15)
-        req = StockBarsRequest(
-            symbol_or_symbols=ticker,
-            timeframe=TimeFrame.Day,
-            start=start,
-            feed=DataFeed.IEX,
-        )
-        bars = self.data.get_stock_bars(req)
-        data = bars.data.get(ticker, [])
-        rows = [{"close": float(b.close), "high": float(b.high), "low": float(b.low)} for b in data]
+        def _fetch():
+            start = datetime.now(timezone.utc) - timedelta(days=int(days * 1.6) + 15)
+            req = StockBarsRequest(
+                symbol_or_symbols=ticker,
+                timeframe=TimeFrame.Day,
+                start=start,
+                feed=DataFeed.IEX,
+            )
+            bars = self.data.get_stock_bars(req)
+            data = bars.data.get(ticker, [])
+            return [{"close": float(b.close), "high": float(b.high), "low": float(b.low)} for b in data]
+        rows = self._cached(f"bars:{ticker}:{days}", 120, _fetch)
         return rows[-days:] if len(rows) > days else rows
 
     # ---------- orders ----------
@@ -105,7 +131,9 @@ class AlpacaService:
             side=OrderSide.BUY,
             time_in_force=TimeInForce.DAY,
         )
-        o = self.trading.submit_order(req)
+        with self._lock:
+            o = self.trading.submit_order(req)
+        self._invalidate()
         return {"id": str(o.id), "status": str(o.status), "qty": float(o.qty or 0)}
 
     def submit_buy_limit(self, ticker, qty, limit_price):
@@ -117,18 +145,22 @@ class AlpacaService:
             time_in_force=TimeInForce.DAY,
             limit_price=round(float(limit_price), 2),
         )
-        o = self.trading.submit_order(req)
+        with self._lock:
+            o = self.trading.submit_order(req)
+        self._invalidate()
         return {"id": str(o.id), "status": str(o.status), "qty": float(o.qty or 0)}
 
     def get_open_orders(self, ticker=None):
         kwargs = {"status": QueryOrderStatus.OPEN}
         if ticker:
             kwargs["symbols"] = [ticker]
-        return self.trading.get_orders(filter=GetOrdersRequest(**kwargs))
+        with self._lock:
+            return self.trading.get_orders(filter=GetOrdersRequest(**kwargs))
 
     def cancel_all_orders(self):
         try:
-            self.trading.cancel_orders()
+            with self._lock:
+                self.trading.cancel_orders()
         except Exception:
             pass
 
@@ -139,19 +171,23 @@ class AlpacaService:
             side=OrderSide.SELL,
             time_in_force=TimeInForce.DAY,
         )
-        o = self.trading.submit_order(req)
+        with self._lock:
+            o = self.trading.submit_order(req)
+        self._invalidate()
         return {"id": str(o.id), "status": str(o.status), "qty": float(o.qty or 0)}
 
     def cancel_order(self, order_id):
-        self.trading.cancel_order_by_id(order_id)
+        with self._lock:
+            self.trading.cancel_order_by_id(order_id)
 
     def get_clock(self):
-        c = self.trading.get_clock()
+        c = self._cached("clock", 30, lambda: self.trading.get_clock())
         return {"is_open": bool(c.is_open), "next_open": str(c.next_open), "next_close": str(c.next_close)}
 
     def get_asset(self, symbol):
         """Validate/lookup a tradable equity. Raises if the symbol does not exist."""
-        a = self.trading.get_asset(symbol.upper())
+        with self._lock:
+            a = self.trading.get_asset(symbol.upper())
         return {
             "symbol": a.symbol,
             "name": a.name,

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { ShieldCheck, AlertTriangle, Save, Clock } from "lucide-react";
-import client, { fmtUSD } from "../api";
+import client from "../api";
 import { Card, CardHeader, Button, Input, Badge, Toggle, Spinner } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useSystem } from "../components/SystemContext";
+import Strategy from "./Strategy";
 
 export default function Settings() {
   const toast = useToast();
@@ -35,17 +36,12 @@ export default function Settings() {
   const isLive = state.trading_mode === "live";
 
   const switchMode = async (targetLive) => {
-    if (targetLive) {
-      setShowLiveConfirm(true);
-      return;
-    }
+    if (targetLive) { setShowLiveConfirm(true); return; }
     try {
       await client.post("/system/mode", { mode: "paper" });
       await refresh();
       toast("Switched to PAPER mode", "success");
-    } catch (e) {
-      toast("Failed to switch mode", "error");
-    }
+    } catch (e) { toast("Failed to switch mode", "error"); }
   };
 
   const confirmLive = async () => {
@@ -55,9 +51,7 @@ export default function Settings() {
       setShowLiveConfirm(false);
       setConfirmText("");
       toast("LIVE mode enabled — real orders are now possible", "warning");
-    } catch (e) {
-      toast(e.response?.data?.detail || "Confirmation failed", "error");
-    }
+    } catch (e) { toast(e.response?.data?.detail || "Confirmation failed", "error"); }
   };
 
   const saveLimits = async () => {
@@ -69,23 +63,17 @@ export default function Settings() {
       });
       await refresh();
       toast("Safety limits saved", "success");
-    } catch (e) {
-      toast("Failed to save limits", "error");
-    } finally {
-      setSavingLimits(false);
-    }
+    } catch (e) { toast("Failed to save limits", "error"); } finally { setSavingLimits(false); }
   };
 
   const toggleScheduler = async () => {
     try {
       await client.put("/system/safety-limits", { scheduler_enabled: !state.scheduler_enabled });
       await refresh();
-    } catch (e) {
-      toast("Failed to update scheduler", "error");
-    }
+    } catch (e) { toast("Failed to update scheduler", "error"); }
   };
 
-  const saveLongTerm = async () => {
+  const saveAutomation = async () => {
     setSavingLT(true);
     try {
       await client.put("/system/safety-limits", {
@@ -95,34 +83,32 @@ export default function Settings() {
         rebalance_threshold_pct: parseFloat(rebal),
       });
       await refresh();
-      toast("Long-term strategy settings saved", "success");
-    } catch (e) {
-      toast(e.response?.data?.detail || "Failed to save", "error");
-    } finally {
-      setSavingLT(false);
-    }
+      toast("Automation settings saved", "success");
+    } catch (e) { toast(e.response?.data?.detail || "Failed to save", "error"); } finally { setSavingLT(false); }
   };
 
+  const label = "text-[11px] font-semibold uppercase tracking-wider text-zinc-500";
+
   return (
-    <div className="space-y-6 max-w-3xl" data-testid="settings-page">
+    <div className="space-y-6 max-w-4xl" data-testid="settings-page">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-sm text-zinc-500">Trading mode and global safety limits</p>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Settings</h1>
+        <p className="text-sm text-zinc-500">Trading mode, your strategy rules, safety limits and automation — all in one place.</p>
       </div>
 
       {/* Trading mode */}
       <Card>
         <CardHeader title="Trading Mode" subtitle="Live mode requires an explicit typed confirmation" />
         <div className="px-5 py-5">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch gap-4">
             <button
               onClick={() => switchMode(false)}
               data-testid="select-paper-btn"
-              className={`flex-1 border rounded-md p-4 text-left transition-colors ${
-                !isLive ? "border-klein bg-blue-50/50 ring-1 ring-klein" : "border-zinc-200 hover:bg-zinc-50"
+              className={`flex-1 border rounded-lg p-4 text-left transition-colors ${
+                !isLive ? "border-klein bg-klein/10 ring-1 ring-klein" : "border-zinc-800 hover:bg-zinc-800"
               }`}
             >
-              <div className="flex items-center gap-2 font-semibold">
+              <div className="flex items-center gap-2 font-semibold text-zinc-100">
                 <ShieldCheck size={18} className="text-klein" /> Paper
               </div>
               <p className="text-xs text-zinc-500 mt-1">Simulated orders. Safe for testing.</p>
@@ -130,8 +116,8 @@ export default function Settings() {
             <button
               onClick={() => switchMode(true)}
               data-testid="select-live-btn"
-              className={`flex-1 border rounded-md p-4 text-left transition-colors ${
-                isLive ? "border-loss bg-red-50/50 ring-1 ring-loss" : "border-zinc-200 hover:bg-zinc-50"
+              className={`flex-1 border rounded-lg p-4 text-left transition-colors ${
+                isLive ? "border-loss bg-loss/10 ring-1 ring-loss" : "border-zinc-800 hover:bg-zinc-800"
               }`}
             >
               <div className="flex items-center gap-2 font-semibold text-loss">
@@ -140,53 +126,49 @@ export default function Settings() {
               <p className="text-xs text-zinc-500 mt-1">Real money. Real orders against your live account.</p>
             </button>
           </div>
-          <div className="mt-4 flex items-center gap-2 text-sm">
+          <div className="mt-4 flex items-center gap-2 text-sm text-zinc-400">
             Current mode:
-            <Badge tone={isLive ? "danger" : "klein"} testid="current-mode-badge">{state.trading_mode}</Badge>
+            <Badge tone={isLive ? "danger" : "warn"}>{state.trading_mode}</Badge>
           </div>
 
           {showLiveConfirm && (
-            <div className="mt-4 border border-loss rounded-md bg-red-50 p-4" data-testid="live-confirm-box">
+            <div className="mt-4 border border-loss/40 rounded-lg bg-loss/10 p-4" data-testid="live-confirm-box">
               <div className="flex items-center gap-2 text-loss font-semibold text-sm">
                 <AlertTriangle size={16} /> Enable LIVE trading
               </div>
-              <p className="text-xs text-zinc-600 mt-1">
-                This will place real orders with real money. Type <span className="font-mono font-bold">CONFIRM LIVE</span> to proceed.
+              <p className="text-xs text-zinc-400 mt-1">
+                This will place real orders with real money. Type <span className="font-mono font-bold text-zinc-200">CONFIRM LIVE</span> to proceed.
               </p>
-              <div className="flex gap-2 mt-3">
-                <Input
-                  placeholder="CONFIRM LIVE"
-                  value={confirmText}
-                  data-testid="live-confirm-input"
-                  onChange={(e) => setConfirmText(e.target.value)}
-                  className="font-mono"
-                />
+              <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                <Input placeholder="CONFIRM LIVE" value={confirmText} data-testid="live-confirm-input"
+                  onChange={(e) => setConfirmText(e.target.value)} className="font-mono" />
                 <Button variant="danger" onClick={confirmLive} disabled={confirmText !== "CONFIRM LIVE"} data-testid="confirm-live-btn">
                   Enable Live
                 </Button>
-                <Button variant="outline" onClick={() => { setShowLiveConfirm(false); setConfirmText(""); }}>
-                  Cancel
-                </Button>
+                <Button variant="outline" onClick={() => { setShowLiveConfirm(false); setConfirmText(""); }}>Cancel</Button>
               </div>
             </div>
           )}
         </div>
       </Card>
 
+      {/* Strategy rules (embedded) */}
+      <Strategy embedded />
+
       {/* Safety limits */}
       <Card>
-        <CardHeader title="Global Safety Limits" subtitle="Enforced server-side, independent of strategy logic" />
+        <CardHeader title="Safety Limits" subtitle="Enforced server-side, independent of strategy logic" />
         <div className="px-5 py-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Max daily loss (USD)</label>
+              <label className={label}>Max daily loss (USD)</label>
               <Input type="number" step="50" value={maxLoss} data-testid="max-daily-loss-input" onChange={(e) => setMaxLoss(e.target.value)} className="mt-1 font-mono" />
-              <p className="text-xs text-zinc-400 mt-1">Kill switch auto-engages if breached.</p>
+              <p className="text-xs text-zinc-600 mt-1">Kill switch auto-engages if breached.</p>
             </div>
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Max total exposure (USD)</label>
+              <label className={label}>Max total exposure (USD)</label>
               <Input type="number" step="500" value={maxExp} data-testid="max-exposure-input" onChange={(e) => setMaxExp(e.target.value)} className="mt-1 font-mono" />
-              <p className="text-xs text-zinc-400 mt-1">Hard cap across all open positions.</p>
+              <p className="text-xs text-zinc-600 mt-1">Hard cap across all open positions.</p>
             </div>
           </div>
           <div className="flex justify-end">
@@ -197,60 +179,51 @@ export default function Settings() {
         </div>
       </Card>
 
-      {/* Long-term strategy settings */}
-      <Card data-testid="longterm-settings-card">
-        <CardHeader title="Strategy Cadence & Long-Term Settings" subtitle="Daily cadence runs before US open using prior-day closes" />
+      {/* Automation */}
+      <Card data-testid="automation-card">
+        <CardHeader title="Automation" subtitle="When the strategy runs automatically (before US open)" />
         <div className="px-5 py-5 space-y-4">
+          <div className="flex items-center justify-between border border-zinc-800 rounded-lg px-4 py-3">
+            <div className="flex items-center gap-2 text-sm text-zinc-300">
+              <Clock size={16} />
+              {state.scheduler_enabled ? "Scheduler is running" : "Scheduler is paused"}
+            </div>
+            <Toggle checked={state.scheduler_enabled} onChange={toggleScheduler} testid="scheduler-toggle" />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Schedule frequency</label>
+              <label className={label}>Schedule frequency</label>
               <div className="flex gap-2 mt-1">
-                {["daily", "weekly"].map((f) => (
-                  <button
-                    key={f}
-                    data-testid={`freq-${f}`}
-                    onClick={() => setFreq(f)}
-                    className={`flex-1 border rounded-md py-2 text-sm capitalize transition-colors ${
-                      freq === f ? "border-klein bg-blue-50/50 ring-1 ring-klein font-medium" : "border-zinc-200 hover:bg-zinc-50"
-                    }`}
-                  >
-                    {f}
+                {["daily", "weekly"].map((ff) => (
+                  <button key={ff} data-testid={`freq-${ff}`} onClick={() => setFreq(ff)}
+                    className={`flex-1 border rounded-lg py-2 text-sm capitalize transition-colors ${
+                      freq === ff ? "border-klein bg-klein/15 text-zinc-50 font-medium" : "border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+                    }`}>
+                    {ff}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Benchmark ticker</label>
+              <label className={label}>Benchmark ticker</label>
               <Input value={benchmark} data-testid="benchmark-input" onChange={(e) => setBenchmark(e.target.value.toUpperCase())} className="mt-1 font-mono uppercase" />
             </div>
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Baseline daily volatility (for vol-sizing)</label>
+              <label className={label}>Baseline daily volatility</label>
               <Input type="number" step="0.005" value={baseVol} data-testid="baseline-vol-input" onChange={(e) => setBaseVol(e.target.value)} className="mt-1 font-mono" />
-              <p className="text-xs text-zinc-400 mt-1">e.g. 0.02 = 2% daily stddev baseline.</p>
+              <p className="text-xs text-zinc-600 mt-1">e.g. 0.02 = 2% daily stddev baseline.</p>
             </div>
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Rebalance flag threshold (0–1)</label>
+              <label className={label}>Rebalance flag threshold (0–1)</label>
               <Input type="number" step="0.05" value={rebal} data-testid="rebal-threshold-input" onChange={(e) => setRebal(e.target.value)} className="mt-1 font-mono" />
-              <p className="text-xs text-zinc-400 mt-1">Flag any position exceeding this share of the portfolio.</p>
+              <p className="text-xs text-zinc-600 mt-1">Flag any position exceeding this share.</p>
             </div>
           </div>
           <div className="flex justify-end">
-            <Button onClick={saveLongTerm} disabled={savingLT} data-testid="save-longterm-btn">
-              <Save size={15} /> {savingLT ? "Saving…" : "Save Strategy Settings"}
+            <Button onClick={saveAutomation} disabled={savingLT} data-testid="save-automation-btn">
+              <Save size={15} /> {savingLT ? "Saving…" : "Save Automation"}
             </Button>
           </div>
-        </div>
-      </Card>
-
-      {/* Scheduler */}
-      <Card>
-        <CardHeader title="Automated Scheduler" subtitle="Runs the strategy on the configured cadence (before US open)" />
-        <div className="px-5 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-zinc-600">
-            <Clock size={16} />
-            {state.scheduler_enabled ? "Scheduler is running" : "Scheduler is paused"}
-          </div>
-          <Toggle checked={state.scheduler_enabled} onChange={toggleScheduler} testid="scheduler-toggle" />
         </div>
       </Card>
     </div>

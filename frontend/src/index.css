@@ -1,9 +1,11 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --klein: #002fa7;
+  --klein: #3b82f6;
 }
 
 * {
@@ -18,14 +20,14 @@ body,
 
 body {
   margin: 0;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
-  background: #f4f4f5;
-  color: #09090b;
+  font-family: "Manrope", system-ui, sans-serif;
+  background: #09090b;
+  color: #e4e4e7;
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: #002fa7;
+  background: #3b82f6;
   color: #fff;
 }
 
@@ -34,15 +36,24 @@ body {
   width: 10px;
   height: 10px;
 }
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
 ::-webkit-scrollbar-thumb {
-  background: #d4d4d8;
-  border: 3px solid #f4f4f5;
+  background: #3f3f46;
+  border: 3px solid #09090b;
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1aa;
+  background: #52525b;
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* date input dark theme */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+  cursor: pointer;
 }

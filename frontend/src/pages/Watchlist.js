@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Plus, Trash2, ChevronDown, ChevronUp, Save, CheckCircle2, XCircle, Star } from "lucide-react";
-import { Link } from "react-router-dom";
 import client from "../api";
 import { Card, CardHeader, Button, Input, Badge, Toggle, Spinner, EmptyState } from "../components/ui";
 import { useToast } from "../components/Toast";
@@ -11,7 +10,7 @@ function Stars({ value, onChange, testid }) {
       {[1, 2, 3, 4, 5].map((n) => (
         <button key={n} type="button" onClick={() => onChange(n)} data-testid={`${testid}-${n}`}
           className="p-0.5 transition-transform hover:scale-110">
-          <Star size={20} className={n <= value ? "fill-klein text-klein" : "text-zinc-300"} />
+          <Star size={20} className={n <= value ? "fill-klein text-klein" : "text-zinc-700"} />
         </button>
       ))}
     </div>
@@ -48,31 +47,31 @@ function StockEditor({ item, onSaved }) {
   };
 
   return (
-    <div className="bg-zinc-50 border-t border-zinc-200 px-5 py-5 space-y-4" data-testid={`stock-editor-${item.ticker}`}>
+    <div className="bg-zinc-950 border-t border-zinc-800 px-5 py-5 space-y-4" data-testid={`stock-editor-${item.ticker}`}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div>
-          <label className="text-sm font-semibold text-zinc-800">Conviction (1–5)</label>
+          <label className="text-sm font-semibold text-zinc-100">Conviction (1–5)</label>
           <p className="text-xs text-zinc-500 mt-0.5 mb-2">How strongly you believe in this stock. The strategy only buys names at or above your global minimum-conviction setting.</p>
           <Stars value={parseInt(form.conviction, 10)} onChange={(v) => set("conviction", v)} testid={`conviction-${item.ticker}`} />
         </div>
         <div>
-          <label className="text-sm font-semibold text-zinc-800">Next earnings date (optional)</label>
+          <label className="text-sm font-semibold text-zinc-100">Next earnings date (optional)</label>
           <p className="text-xs text-zinc-500 mt-0.5 mb-2">Used to pause buys just before earnings. Format YYYY-MM-DD.</p>
           <Input type="date" value={form.next_earnings_date} data-testid={`earnings-${item.ticker}`}
             onChange={(e) => set("next_earnings_date", e.target.value)} className="font-mono" />
         </div>
         <div>
-          <label className="text-sm font-semibold text-zinc-800">Sector (optional)</label>
-          <p className="text-xs text-zinc-500 mt-0.5 mb-2">Shown in the Overview sector breakdown.</p>
+          <label className="text-sm font-semibold text-zinc-100">Sector (optional)</label>
+          <p className="text-xs text-zinc-500 mt-0.5 mb-2">Shown in the Dashboard sector breakdown.</p>
           <Input value={form.sector} data-testid={`sector-${item.ticker}`} placeholder="e.g. Technology"
             onChange={(e) => set("sector", e.target.value)} />
         </div>
         <div className="md:col-span-2">
-          <label className="text-sm font-semibold text-zinc-800">Thesis — why you own it (optional)</label>
+          <label className="text-sm font-semibold text-zinc-100">Thesis — why you own it (optional)</label>
           <p className="text-xs text-zinc-500 mt-0.5 mb-2">Your reasoning, e.g. a pick from Financial Education / BWB, strong moat, growth, etc.</p>
           <textarea value={form.thesis} data-testid={`thesis-${item.ticker}`} rows={3}
             onChange={(e) => set("thesis", e.target.value)}
-            className="w-full border border-zinc-300 rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-zinc-950" />
+            className="w-full border border-zinc-800 bg-zinc-950 text-zinc-100 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-klein focus:border-klein" />
         </div>
       </div>
       <div className="flex justify-end">
@@ -84,7 +83,7 @@ function StockEditor({ item, onSaved }) {
   );
 }
 
-export default function Watchlist() {
+export default function Watchlist({ embedded = false }) {
   const toast = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -157,12 +156,12 @@ export default function Watchlist() {
 
   return (
     <div className="space-y-6" data-testid="watchlist-page">
-      <div className="flex items-start justify-between flex-wrap gap-3">
+      {!embedded && (
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Watchlist</h1>
-          <p className="text-sm text-zinc-500">Pick your stocks and rate your conviction. The buy/sell rules are set once on the <Link to="/strategy" className="text-klein underline">Strategy</Link> page.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-50">Watchlist</h1>
+          <p className="text-sm text-zinc-500">Pick your stocks and rate your conviction. Buy/sell rules are set in Settings.</p>
         </div>
-      </div>
+      )}
 
       <Card>
         <CardHeader title="Add a Stock" subtitle="We check the symbol is real and tradable before adding" />
@@ -188,9 +187,9 @@ export default function Watchlist() {
       <Card>
         <CardHeader title="Your Stocks" subtitle={`${items.length} tracked`} />
         {items.length === 0 ? (
-          <EmptyState title="No stocks yet" hint="Add a ticker above to start tracking it." />
+          <EmptyState title="No stocks yet" hint="Add a ticker above to start tracking it." icon={Plus} />
         ) : (
-          <div className="divide-y divide-zinc-100">
+          <div className="divide-y divide-zinc-800">
             {items.map((item) => {
               const open = expanded === item.ticker;
               const conv = item.conviction ?? 3;
@@ -198,21 +197,21 @@ export default function Watchlist() {
                 <div key={item.ticker} data-testid={`watchlist-row-${item.ticker}`}>
                   <div className="flex items-center gap-4 px-5 py-3.5">
                     <div className="w-44 min-w-44">
-                      <div className="font-mono font-bold text-base">{item.ticker}</div>
-                      {item.name && <div className="text-xs text-zinc-400 truncate">{item.name}</div>}
+                      <div className="font-mono font-bold text-base text-zinc-50">{item.ticker}</div>
+                      {item.name && <div className="text-xs text-zinc-500 truncate">{item.name}</div>}
                       <Badge tone={item.active ? "success" : "muted"} className="mt-1">{item.active ? "active" : "paused"}</Badge>
                     </div>
                     <div className="flex-1 min-w-0 hidden md:block">
                       <div className="flex items-center gap-1">
                         {[1, 2, 3, 4, 5].map((n) => (
-                          <Star key={n} size={14} className={n <= conv ? "fill-klein text-klein" : "text-zinc-200"} />
+                          <Star key={n} size={14} className={n <= conv ? "fill-klein text-klein" : "text-zinc-700"} />
                         ))}
-                        <span className="text-xs text-zinc-400 ml-1">conviction</span>
+                        <span className="text-xs text-zinc-500 ml-1">conviction</span>
                       </div>
                       <div className="text-xs text-zinc-500 mt-1 flex flex-wrap gap-x-4">
                         {item.sector && <span>{item.sector}</span>}
                         {item.next_earnings_date && <span>earnings {item.next_earnings_date}</span>}
-                        {item.thesis && <span className="truncate max-w-md italic">“{item.thesis}”</span>}
+                        {item.thesis && <span className="truncate max-w-md italic text-zinc-400">“{item.thesis}”</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

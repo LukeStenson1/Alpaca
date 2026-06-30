@@ -28,10 +28,10 @@ export function ToastProvider({ children }) {
           <div
             key={t.id}
             data-testid="toast"
-            className="flex items-center gap-2 border border-zinc-200 bg-white px-4 py-3 text-sm shadow-sm rounded-md min-w-[260px] max-w-sm"
+            className="flex items-center gap-2 border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm shadow-2xl shadow-black/50 rounded-lg min-w-[260px] max-w-sm"
           >
             {icons[t.type]}
-            <span className="text-zinc-800">{t.message}</span>
+            <span className="text-zinc-100">{t.message}</span>
           </div>
         ))}
       </div>

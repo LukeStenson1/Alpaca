@@ -149,6 +149,18 @@ class AlpacaService:
         c = self.trading.get_clock()
         return {"is_open": bool(c.is_open), "next_open": str(c.next_open), "next_close": str(c.next_close)}
 
+    def get_asset(self, symbol):
+        """Validate/lookup a tradable equity. Raises if the symbol does not exist."""
+        a = self.trading.get_asset(symbol.upper())
+        return {
+            "symbol": a.symbol,
+            "name": a.name,
+            "tradable": bool(a.tradable),
+            "exchange": str(a.exchange),
+            "status": str(a.status),
+            "fractionable": bool(getattr(a, "fractionable", False)),
+        }
+
 
 def get_service(mode="paper"):
     if mode not in _cache:

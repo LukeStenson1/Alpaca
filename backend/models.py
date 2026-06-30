@@ -16,6 +16,7 @@ class Watchlist(Base):
     active = Column(Boolean, default=True)
     notes = Column(Text, nullable=True)
     sector = Column(String, nullable=True)
+    name = Column(String, nullable=True)  # company name from Alpaca asset lookup
 
 
 class Parameters(Base):

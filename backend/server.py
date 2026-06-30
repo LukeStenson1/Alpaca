@@ -48,7 +48,7 @@ def _migrate():
             ("range_pct", "FLOAT DEFAULT 0.15"), ("allow_downtrend_buys", "BOOLEAN DEFAULT 0"),
             ("cooldown_days", "INTEGER DEFAULT 7"),
         ],
-        "watchlist": [("sector", "VARCHAR")],
+        "watchlist": [("sector", "VARCHAR"), ("name", "VARCHAR")],
         "system_state": [
             ("schedule_frequency", "VARCHAR DEFAULT 'daily'"),
             ("schedule_timing", "VARCHAR DEFAULT 'before_open'"),
@@ -136,6 +136,17 @@ def on_startup():
                 db.add(Watchlist(ticker=tk, active=True, date_added=utcnow()))
                 db.add(Parameters(ticker=tk))
             db.commit()
+        # backfill missing company names (one-time, few tickers)
+        try:
+            svc = get_service(db.query(SystemState).get(1).trading_mode)
+            for w in db.query(Watchlist).filter(Watchlist.name.is_(None)).all():
+                try:
+                    w.name = svc.get_asset(w.ticker)["name"]
+                except Exception:
+                    pass
+            db.commit()
+        except Exception:
+            pass
     finally:
         db.close()
     scheduler.start_scheduler()
@@ -486,6 +497,7 @@ def list_watchlist(db: Session = Depends(get_db)):
         p = db.query(Parameters).get(w.ticker)
         out.append({
             "ticker": w.ticker,
+            "name": w.name,
             "date_added": w.date_added.isoformat() if w.date_added else None,
             "active": w.active,
             "notes": w.notes,
@@ -495,6 +507,25 @@ def list_watchlist(db: Session = Depends(get_db)):
     return out
 
 
+@app.get("/api/watchlist/validate")
+def validate_ticker(ticker: str, db: Session = Depends(get_db)):
+    tk = (ticker or "").strip().upper()
+    if not tk:
+        return {"valid": False, "message": "Enter a ticker symbol."}
+    if db.query(Watchlist).get(tk):
+        return {"valid": False, "message": f"{tk} is already in your watchlist."}
+    s = get_state(db)
+    svc = get_service(s.trading_mode)
+    try:
+        asset = svc.get_asset(tk)
+    except Exception:
+        return {"valid": False, "message": f"'{tk}' is not a recognized symbol on Alpaca."}
+    if not asset["tradable"]:
+        return {"valid": False, "message": f"'{tk}' exists but isn't tradable on Alpaca."}
+    return {"valid": True, "name": asset["name"], "exchange": asset["exchange"],
+            "message": f"{tk} — {asset['name']}"}
+
+
 @app.post("/api/watchlist")
 def add_watchlist(body: WatchlistCreate, db: Session = Depends(get_db)):
     tk = body.ticker.strip().upper()
@@ -502,10 +533,18 @@ def add_watchlist(body: WatchlistCreate, db: Session = Depends(get_db)):
         raise HTTPException(400, "ticker required")
     if db.query(Watchlist).get(tk):
         raise HTTPException(400, f"{tk} already in watchlist")
-    db.add(Watchlist(ticker=tk, notes=body.notes, active=True, date_added=utcnow()))
+    s = get_state(db)
+    svc = get_service(s.trading_mode)
+    try:
+        asset = svc.get_asset(tk)
+    except Exception:
+        raise HTTPException(400, f"'{tk}' is not a recognized symbol on Alpaca. Please check the spelling.")
+    if not asset["tradable"]:
+        raise HTTPException(400, f"'{tk}' exists but is not tradable on Alpaca.")
+    db.add(Watchlist(ticker=tk, name=asset["name"], notes=body.notes, active=True, date_added=utcnow()))
     db.add(Parameters(ticker=tk))
     db.commit()
-    return {"ticker": tk, "status": "added"}
+    return {"ticker": tk, "name": asset["name"], "status": "added"}
 
 
 @app.put("/api/watchlist/{ticker}")

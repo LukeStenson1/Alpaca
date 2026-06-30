@@ -64,3 +64,13 @@ engine proposes threshold changes (PENDING, manual approve/reject, no auto-apply
   strategy._evaluate_sells by AGGREGATING all qualifying tranches into a SINGLE sell order
   (reason e.g. "tranches 1, 2 of 4 at +X% gain"). Verified via the harness (full close in one run).
 - Account left flat & clean; mode=paper; live still gated behind typed "CONFIRM LIVE".
+
+## Update (2026-06-30, session 4) — User-friendliness
+- Ticker validation: POST /api/watchlist now verifies the symbol via Alpaca get_asset (rejects bogus/non-tradable);
+  added GET /api/watchlist/validate for live inline feedback; store + show company name (migration adds watchlist.name; startup backfills).
+- Watchlist UI redesigned: company names, plain-English per-row summaries, live "valid/invalid" feedback on add.
+- Param editor rewritten in plain language: grouped sections (When to BUY / Taking profits / Risk controls / Info),
+  one-line descriptions per field, live "= %" helpers, and one-click presets (Conservative/Balanced/Aggressive).
+- NOTE: redesigned param-editor EXPANSION not yet confirmed via automated screenshot (tool couldn't drive the click;
+  no console errors, component compiles). Frontend v2 UI persistence (param save, Settings long-term, Reports) also
+  still PENDING authoritative automated verification (testing agent stopped before running).

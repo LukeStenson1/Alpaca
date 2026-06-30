@@ -17,13 +17,13 @@ const PRESET_DESC = {
 const pct = (v) => (isNaN(parseFloat(v)) ? "" : `${(parseFloat(v) * 100).toFixed(0)}%`);
 const stepsToPct = (s) => (s || "").split(",").map((x) => x.trim()).filter(Boolean).map((x) => (isNaN(parseFloat(x)) ? x : `+${(parseFloat(x) * 100).toFixed(0)}%`)).join(", ");
 
-function NumField({ label, desc, value, onChange, testid, step, helper }) {
+function NumField({ label, desc, value, onChange, testid, step, helper, type = "number" }) {
   return (
     <div>
       <label className="text-sm font-semibold text-zinc-100">{label}</label>
       <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{desc}</p>
       <div className="flex items-center gap-2 mt-1.5">
-        <Input type="number" step={step} value={value} data-testid={testid} onChange={(e) => onChange(e.target.value)} className="font-mono" />
+        <Input type={type} step={step} value={value} data-testid={testid} onChange={(e) => onChange(e.target.value)} className="font-mono" />
         {helper && <span className="text-xs font-mono text-klein whitespace-nowrap min-w-[44px]">{helper}</span>}
       </div>
     </div>
@@ -132,7 +132,7 @@ export default function Strategy({ embedded = false }) {
       </Section></div></Card>
 
       <Card><CardHeader title="Taking profits & Risk" /><div className="px-5 py-5"><Section title="Sell + protect">
-        <NumField label="Profit levels to sell at" testid="sell-steps" step="0.01" value={f.sell_gain_steps} onChange={(v) => set("sell_gain_steps", v)} helper={stepsToPct(f.sell_gain_steps)}
+        <NumField label="Profit levels to sell at" testid="sell-steps" type="text" value={f.sell_gain_steps} onChange={(v) => set("sell_gain_steps", v)} helper={stepsToPct(f.sell_gain_steps)}
           desc="Comma-separated gains, e.g. 0.10, 0.20 = sell some at +10%, +20%." />
         <NumField label="How much to sell each time" testid="tranche" step="0.05" value={f.sell_tranche_pct} onChange={(v) => set("sell_tranche_pct", v)} helper={`= ${pct(f.sell_tranche_pct)}`}
           desc="Fraction sold at each level. 0.25 = 25% at a time." />

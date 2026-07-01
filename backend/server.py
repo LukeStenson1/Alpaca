@@ -822,7 +822,7 @@ def influencer_status():
     return {
         "configured": influencers.keys_configured(),
         "youtube_key": bool(os.environ.get("YOUTUBE_API_KEY")),
-        "llm_key": bool(os.environ.get("EMERGENT_LLM_KEY")),
+        "llm_key": bool(os.environ.get("OPENAI_API_KEY")),
     }
 
 

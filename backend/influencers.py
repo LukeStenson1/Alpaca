@@ -12,7 +12,7 @@ import json
 import logging
 from datetime import datetime, timezone, timedelta
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import OpenAI
 
 import youtube_service
 from alpaca_service import get_service

@@ -173,3 +173,19 @@ class GlobalStrategy(Base):
     min_conviction_to_buy = Column(Integer, default=3)   # only buy names rated >= this
     earnings_blackout_days = Column(Integer, default=5)  # don't buy within N days of earnings
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+
+class Fundamentals(Base):
+    """Cached FMP fundamentals per symbol (refreshed ~daily)."""
+    __tablename__ = "fundamentals"
+    symbol = Column(String, primary_key=True)
+    pe_ratio = Column(Float, nullable=True)
+    profit_margin = Column(Float, nullable=True)
+    operating_margin = Column(Float, nullable=True)
+    revenue_growth = Column(Float, nullable=True)
+    earnings_growth = Column(Float, nullable=True)
+    market_cap = Column(Float, nullable=True)
+    is_etf = Column(Boolean, default=False)
+    error = Column(String, nullable=True)
+    fetched_at = Column(DateTime, default=utcnow)

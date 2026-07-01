@@ -13,12 +13,13 @@ from database import Base, engine, get_db, SessionLocal
 from models import (
     Watchlist, Parameters, Trade, PositionState, Suggestion,
     AccountSnapshot, Alert, SystemState, GlobalStrategy,
-    InfluencerChannel, InfluencerIdea,
+    InfluencerChannel, InfluencerIdea, Fundamentals,
 )
 from alpaca_service import get_service
 import strategy
 import suggestions
 import influencers
+import fundamentals as fundamentals_svc
 import scheduler
 
 logging.basicConfig(level=logging.INFO)
@@ -894,6 +895,43 @@ def dismiss_idea(iid: int, db: Session = Depends(get_db)):
     i.status = "dismissed"
     db.commit()
     return {"id": iid, "status": "dismissed"}
+
+
+# ---------------- fundamentals + conviction x valuation shortlist ----------------
+@app.get("/api/fundamentals/status")
+def fundamentals_status():
+    return {"configured": fundamentals_svc.configured()}
+
+
+@app.get("/api/fundamentals/{symbol}")
+def get_fundamentals(symbol: str, db: Session = Depends(get_db)):
+    if not fundamentals_svc.configured():
+        raise HTTPException(400, "FMP_API_KEY not configured")
+    f = fundamentals_svc.get_fundamentals(db, symbol)
+    return {
+        "symbol": f.symbol, "pe_ratio": f.pe_ratio, "profit_margin": f.profit_margin,
+        "operating_margin": f.operating_margin, "revenue_growth": f.revenue_growth,
+        "earnings_growth": f.earnings_growth, "market_cap": f.market_cap,
+        "is_etf": f.is_etf, "error": f.error,
+        "fetched_at": f.fetched_at.isoformat() if f.fetched_at else None,
+        "quality_score": fundamentals_svc.quality_score(f),
+    }
+
+
+@app.post("/api/fundamentals/refresh")
+def refresh_fundamentals(db: Session = Depends(get_db)):
+    if not fundamentals_svc.configured():
+        raise HTTPException(400, "FMP_API_KEY not configured")
+    n = fundamentals_svc.refresh_all(db)
+    return {"refreshed": n, "shortlist": fundamentals_svc.build_shortlist(db)}
+
+
+@app.get("/api/shortlist")
+def get_shortlist(db: Session = Depends(get_db)):
+    return {
+        "configured": fundamentals_svc.configured(),
+        "items": fundamentals_svc.build_shortlist(db),
+    }
 
 
 @app.get("/api/")

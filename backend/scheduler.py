@@ -7,6 +7,7 @@ from database import SessionLocal
 from models import SystemState
 import strategy
 import suggestions
+import influencers
 
 logger = logging.getLogger("scheduler")
 _scheduler = None
@@ -37,6 +38,20 @@ def _suggestion_job():
         logger.info("scheduled suggestion run created %s suggestions", n)
     except Exception as e:
         logger.exception("suggestion job failed: %s", e)
+    finally:
+        db.close()
+
+
+def _influencer_job():
+    if not influencers.keys_configured():
+        return
+    db = SessionLocal()
+    try:
+        import asyncio
+        res = asyncio.run(influencers.scan_all(db))
+        logger.info("scheduled influencer scan: %s", res)
+    except Exception as e:
+        logger.exception("influencer scan job failed: %s", e)
     finally:
         db.close()
 
@@ -72,6 +87,10 @@ def start_scheduler():
     # suggestions quarterly (1st of Jan/Apr/Jul/Oct), gated by sample size inside the engine
     _scheduler.add_job(_suggestion_job, CronTrigger(month="1,4,7,10", day=1, hour=0, minute=0,
                        timezone="UTC"), id="suggestions", max_instances=1,
+                       coalesce=True, replace_existing=True)
+    # weekly influencer scan (Mon 12:30 UTC), gated by configured keys inside the job
+    _scheduler.add_job(_influencer_job, CronTrigger(day_of_week="mon", hour=12, minute=30,
+                       timezone="UTC"), id="influencer_scan", max_instances=1,
                        coalesce=True, replace_existing=True)
     _scheduler.start()
     logger.info("scheduler started (strategy=%s)", freq)

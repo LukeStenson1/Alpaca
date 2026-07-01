@@ -150,7 +150,116 @@ def run_strategy(db, manual=False):
             summary["errors"].append(f"{w.ticker} buy error: {e}")
             log_alert(db, "order_failure", f"{w.ticker} buy failed: {e}", "warning")
 
+    # weekly accumulation (DCA) — runs at most once per 7 days
+    try:
+        total_exposure = sum(p["market_value"] for p in positions.values())
+        run_accumulation(db, svc, gconf, state, positions, total_exposure, summary)
+    except Exception as e:
+        summary["errors"].append(f"accumulation error: {e}")
+        log_alert(db, "order_failure", f"Accumulation failed: {e}", "warning")
+
     return summary
+
+
+def _days_since(date_str):
+    if not date_str:
+        return 9999
+    try:
+        d = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        return (utcnow() - d).days
+    except ValueError:
+        return 9999
+
+
+def run_accumulation(db, svc, gconf, state, positions, total_exposure, summary, force=False):
+    """Weekly dollar-cost-averaging: split weekly_budget across eligible active stocks,
+    weighted by conviction (tilted by cached fundamentals quality). Long-term buys via
+    market notional orders; respects per-stock max size and total exposure caps."""
+    if not gconf.accumulate_enabled and not force:
+        return
+    if not force and _days_since(state.last_accumulate_date) < 7:
+        summary["skipped"].append(
+            f"accumulation: already ran {_days_since(state.last_accumulate_date)}d ago (weekly)")
+        return
+
+    from models import Fundamentals  # local import to avoid cycle
+    active = db.query(Watchlist).filter(Watchlist.active == True).all()  # noqa: E712
+    eligible = []
+    for w in active:
+        conv = w.conviction if w.conviction is not None else 3
+        if conv < (gconf.min_conviction_to_buy or 0):
+            continue
+        # earnings blackout
+        if w.next_earnings_date and gconf.earnings_blackout_days:
+            try:
+                ed = datetime.strptime(w.next_earnings_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                dt = (ed - utcnow()).days
+                if 0 <= dt <= gconf.earnings_blackout_days:
+                    continue
+            except ValueError:
+                pass
+        f = db.query(Fundamentals).get(w.ticker)
+        tilt = 1.0
+        if f and f.pe_ratio is not None:  # has usable fundamentals
+            from fundamentals import quality_score
+            q = quality_score(f)
+            if q is not None:
+                tilt = 0.75 + q / 200.0  # ~0.75..1.25
+        eligible.append((w, conv, conv * tilt))
+
+    if not eligible:
+        summary["skipped"].append("accumulation: no eligible stocks (check conviction gate)")
+        return
+
+    budget = float(gconf.weekly_budget_usd or 0)
+    total_w = sum(x[2] for x in eligible)
+    accumulated = []
+    for w, conv, weight in eligible:
+        alloc = budget * weight / total_w
+        pos = positions.get(w.ticker)
+        current_val = pos["market_value"] if pos else 0.0
+        room = gconf.max_position_size_usd - current_val
+        if room <= 1:
+            continue
+        alloc = min(alloc, room, state.max_total_exposure_usd - total_exposure)
+        if alloc < 1:
+            continue
+        try:
+            price = svc.get_latest_price(w.ticker)
+        except Exception:
+            price = pos["current_price"] if pos else None
+        order = svc.submit_buy_notional(w.ticker, round(alloc, 2))
+        qty = (alloc / price) if price else float(order.get("qty") or 0)
+        reason = (f"Weekly accumulation: ${alloc:.2f} (conviction {conv}/5, "
+                  f"weight {weight / total_w * 100:.0f}% of ${budget:.0f} budget)")
+        db.add(Trade(ticker=w.ticker, side="buy", quantity=round(qty, 6),
+                     price=round(price, 2) if price else 0.0, order_id=order["id"],
+                     trigger_reason=reason, params_snapshot=_params_snapshot(gconf),
+                     timestamp=utcnow()))
+        pstate = db.query(PositionState).filter(
+            PositionState.ticker == w.ticker, PositionState.status == "open").first()
+        if not pstate:
+            pstate = PositionState(ticker=w.ticker, original_qty=qty,
+                                   avg_entry_price=price or 0.0, tranches_executed=[],
+                                   opened_at=utcnow(), status="open", entry_order_id=order["id"])
+            db.add(pstate)
+        elif price:
+            new_qty = pstate.original_qty + qty
+            if new_qty > 0:
+                pstate.avg_entry_price = (
+                    (pstate.avg_entry_price * pstate.original_qty + price * qty) / new_qty)
+                pstate.original_qty = new_qty
+        total_exposure += alloc
+        accumulated.append({"ticker": w.ticker, "alloc": round(alloc, 2), "reason": reason})
+        summary["buys"].append({"ticker": w.ticker, "qty": round(qty, 6),
+                                "notional": round(alloc, 2), "reason": reason})
+
+    state.last_accumulate_date = utcnow().strftime("%Y-%m-%d")
+    db.commit()
+    summary["accumulated"] = accumulated
+    if accumulated:
+        log_alert(db, "info", f"Weekly accumulation bought {len(accumulated)} stocks "
+                  f"(${budget:.0f} budget)", "info")
 
 
 def _reconcile(db, svc, positions, summary):

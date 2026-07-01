@@ -20,6 +20,7 @@ import strategy
 import suggestions
 import influencers
 import fundamentals as fundamentals_svc
+import screener
 import scheduler
 
 logging.basicConfig(level=logging.INFO)
@@ -112,6 +113,8 @@ class GlobalStrategyBody(BaseModel):
     investing_style: Optional[str] = None
     min_conviction_to_buy: Optional[int] = None
     earnings_blackout_days: Optional[int] = None
+    accumulate_enabled: Optional[bool] = None
+    weekly_budget_usd: Optional[float] = None
 
 
 class ParametersUpdate(BaseModel):
@@ -528,6 +531,8 @@ def get_strategy_config(db: Session = Depends(get_db)):
         "investing_style": g.investing_style,
         "min_conviction_to_buy": g.min_conviction_to_buy,
         "earnings_blackout_days": g.earnings_blackout_days,
+        "accumulate_enabled": g.accumulate_enabled,
+        "weekly_budget_usd": g.weekly_budget_usd,
         "updated_at": g.updated_at.isoformat() if g.updated_at else None,
     }
 

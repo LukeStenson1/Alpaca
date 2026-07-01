@@ -118,6 +118,7 @@ class SystemState(Base):
     baseline_volatility = Column(Float, default=0.02)      # for volatility-adjusted sizing
     benchmark_ticker = Column(String, default="SPY")
     rebalance_threshold_pct = Column(Float, default=0.20)  # flag if a position exceeds this share
+    last_accumulate_date = Column(String, nullable=True)   # YYYY-MM-DD of last weekly accumulation
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 
@@ -172,6 +173,9 @@ class GlobalStrategy(Base):
     investing_style = Column(String, default="blended")  # longterm / blended / tactical
     min_conviction_to_buy = Column(Integer, default=3)   # only buy names rated >= this
     earnings_blackout_days = Column(Integer, default=5)  # don't buy within N days of earnings
+    # weekly accumulation (dollar-cost-averaging) mode
+    accumulate_enabled = Column(Boolean, default=False)
+    weekly_budget_usd = Column(Float, default=500.0)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 

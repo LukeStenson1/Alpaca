@@ -46,7 +46,7 @@ def utcnow():
 
 
 def keys_configured():
-    return bool(os.environ.get("YOUTUBE_API_KEY")) and bool(os.environ.get("EMERGENT_LLM_KEY"))
+    return bool(os.environ.get("YOUTUBE_API_KEY")) and bool(os.environ.get("OPENAI_API_KEY"))
 
 
 def seed_default_channels(db):

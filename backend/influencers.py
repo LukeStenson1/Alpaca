@@ -77,11 +77,7 @@ def _parse_json(text):
 
 
 async def _extract_ideas(video):
-    chat = LlmChat(
-        api_key=os.environ.get("EMERGENT_LLM_KEY"),
-        session_id=f"inf-{video['video_id']}",
-        system_message=SYSTEM_MSG,
-    ).with_model(*LLM_MODEL)
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
     prompt = (
         f"Channel: {video.get('channel_title')}\n"
         f"Title: {video.get('title')}\n"
@@ -89,11 +85,18 @@ async def _extract_ideas(video):
         "Extract the stock ideas as a JSON list."
     )
     try:
-        resp = await chat.send_message(UserMessage(text=prompt))
+        resp = client.chat.completions.create(
+            model="gpt-5.4",
+            messages=[
+                {"role": "system", "content": SYSTEM_MSG},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content
     except Exception as e:
         logger.warning("LLM extraction failed for %s: %s", video["video_id"], e)
         return []
-    return _parse_json(resp if isinstance(resp, str) else getattr(resp, "content", ""))
+    return _parse_json(text)
 
 
 def _persist_idea(db, svc, ch, video, idea, summary):
